@@ -1,4 +1,4 @@
-# Multi-Frequency LeRobot Dataset
+# Humancoin LeRobot
 
 > 📖 中文文档：[README_zh-CN.md](README_zh-CN.md)
 
@@ -8,7 +8,7 @@
 
 ## Table of Contents
 
-- [Multi-Frequency LeRobot Dataset](#multi-frequency-lerobot-dataset)
+- [Humancoin LeRobot](#humancoin-lerobot)
   - [Table of Contents](#table-of-contents)
   - [1. Motivation: Why Multi-Frequency Support](#1-motivation-why-multi-frequency-support)
   - [2. Installation](#2-installation)
@@ -53,7 +53,7 @@ Real robot systems typically include a variety of sensors with wildly different 
 
 The native LeRobotDataset squeezes everything into one merged parquet: low-rate sensors have to be upsampled, high-rate sensors get truncated or averaged — the original time precision is lost.
 
-**The mf_lerobot solution**: every sensor is stored independently as a time-indexed parquet file. At read time, a `window` parameter defines "how to aggregate data around the query timestamp" — no pre-resampling needed.
+**The humancoin_lerobot solution**: every sensor is stored independently as a time-indexed parquet file. At read time, a `window` parameter defines "how to aggregate data around the query timestamp" — no pre-resampling needed.
 
 **Writing** — `add_frame` routes each key to its feature buffer; `save_episode()` flushes them to disk:
 
@@ -141,8 +141,8 @@ The result of `ds[10]` (t=0.333s):
 ## 2. Installation
 
 ```bash
-git clone https://github.com/Koorye/Multi-Frequency-LeRobot
-cd Multi-Frequency-LeRobot
+git clone https://github.com/RoboCoin-BAAI/HumanCoin-LeRobot
+cd HumanCoin-LeRobot
 pip install -e .
 
 # dependencies
@@ -164,9 +164,9 @@ Dependencies:
 
 ```python
 import numpy as np
-from mf_lerobot import MultiFrequencyLeRobotDataset
+from humancoin_lerobot import HumancoinLeRobotDataset
 
-ds = MultiFrequencyLeRobotDataset.create(
+ds = HumancoinLeRobotDataset.create(
     repo_id="my_robot", root="data/", fps=30,
     features={
         # camera: dtype="video" auto-encodes to MP4
@@ -225,7 +225,7 @@ ds.save_episode()
 **Reading** — window features return all readings in the window, nearest features return a single vector:
 
 ```python
-ds = MultiFrequencyLeRobotDataset(repo_id="my_robot", root="data/")
+ds = HumancoinLeRobotDataset(repo_id="my_robot", root="data/")
 item = ds[10]
 
 item["observation.imu"]             # tensor([33, 6]) — 33 readings in (-0.033, 0]
@@ -499,7 +499,7 @@ The master-clock frame timestamp is the query anchor, but a feature's readings d
 "window": (-0.066, 0.0)   # (t-66ms, t], ~66 readings
 
 # override at read time
-ds = MultiFrequencyLeRobotDataset(
+ds = HumancoinLeRobotDataset(
     repo_id="my_robot", root="data/",
     window_overrides={"observation.imu": (-0.100, 0.0)},
 )
@@ -517,7 +517,7 @@ Note that temperature (10Hz) has no sample at 0.333 — its sampling grid is 0.3
 ### Creating a Dataset
 
 ```python
-ds = MultiFrequencyLeRobotDataset.create(
+ds = HumancoinLeRobotDataset.create(
     repo_id="my_robot",
     fps=30,
     features={...},          # see Feature Definition Format below
@@ -611,7 +611,7 @@ ds.save_episode()    # flush all buffers, run alignment/video checks, reset coun
 ### Reading
 
 ```python
-ds = MultiFrequencyLeRobotDataset(
+ds = HumancoinLeRobotDataset(
     repo_id="robot", root="data/",
     episodes=[0, 2],                                    # load only episodes 0, 2
     image_transforms=my_transforms,                      # torchvision transforms
@@ -670,12 +670,12 @@ item = ds[10]
 ```mermaid
 flowchart TB
     subgraph Entry["entry layer"]
-        DS["MultiFrequencyLeRobotDataset<br/>dataset.py · orchestrator<br/>(inherits LeRobotDataset)"]
+        DS["HumancoinLeRobotDataset<br/>dataset.py · orchestrator<br/>(inherits LeRobotDataset)"]
     end
 
     subgraph Core["core layer"]
         IX["MasterIndex<br/>index.py"]
-        MD["MultiFrequencyDatasetMetadata<br/>metadata.py"]
+        MD["HumancoinDatasetMetadata<br/>metadata.py"]
     end
 
     subgraph Features["feature layer"]
@@ -726,13 +726,13 @@ flowchart TB
 **File layout:**
 
 ```
-src/mf_lerobot/
+src/humancoin_lerobot/
 ├── dataset.py      (341 lines)  orchestrator — add_frame / save_episode / __getitem__
 ├── audio.py        (185 lines)  AudioFeature — buffer chunks, write WAV + timestamp parquet
 ├── parquet.py      (168 lines)  ParquetFeature — write buffer, save parquet, load, window query
 ├── video.py        (168 lines)  VideoFeature — save PNG, encode MP4, decode frames
 ├── index.py        (127 lines)  MasterIndex — frame index I/O
-├── metadata.py     (123 lines)  MultiFrequencyDatasetMetadata — info.json management
+├── metadata.py     (123 lines)  HumancoinDatasetMetadata — info.json management
 ├── checker.py      (162 lines)  DatasetChecker — video frame count + audio integrity + timestamp alignment checks
 └── utils.py        (236 lines)  constants + info.json creation/validation
 ```
@@ -749,7 +749,7 @@ src/mf_lerobot/
 
 ## 8. Comparison with Native LeRobotDataset
 
-| Aspect | Native LeRobotDataset | mf_lerobot |
+| Aspect | Native LeRobotDataset | humancoin_lerobot |
 |------|-------------------|------------|
 | Storage | 1 merged parquet | N per-feature parquets |
 | Multi-rate sensors | pre-resampling required | native rates, independent storage |

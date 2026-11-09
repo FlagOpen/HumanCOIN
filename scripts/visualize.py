@@ -18,7 +18,7 @@ import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib.gridspec import GridSpec
 
-from mf_lerobot import MultiFrequencyLeRobotDataset
+from humancoin_lerobot import HumancoinLeRobotDataset
 
 # ── Dark theme ──
 plt.style.use("dark_background")
@@ -30,7 +30,7 @@ matplotlib.rcParams.update({
 })
 
 root = Path(__file__).parent.parent / "data" / "demo"
-ds = MultiFrequencyLeRobotDataset(repo_id="robot_demo", root=root, video_backend="pyav")
+ds = HumancoinLeRobotDataset(repo_id="robot_demo", root=root, video_backend="pyav")
 
 CAMERA_KEYS = sorted(k for k, ft in ds.meta.features.items()
                      if ft.get("dtype") in ("video", "image"))

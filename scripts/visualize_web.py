@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Web visualizer for mf_lerobot datasets.
+"""Web visualizer for humancoin_lerobot datasets.
 
 Serves a browser UI (``web_visualizer.html``) plus a small JSON/JPEG API over
 the dataset::
@@ -43,9 +43,9 @@ import pyarrow.parquet as pq
 from scipy import signal as sp_signal
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from mf_lerobot import MultiFrequencyLeRobotDataset  # noqa: E402
-from mf_lerobot.utils import DEFAULT_VIDEO_PATH  # noqa: E402
-from mf_lerobot.video import VideoFeature  # noqa: E402
+from humancoin_lerobot import HumancoinLeRobotDataset  # noqa: E402
+from humancoin_lerobot.utils import DEFAULT_VIDEO_PATH  # noqa: E402
+from humancoin_lerobot.video import VideoFeature  # noqa: E402
 
 
 def _sanitize(obj):
@@ -242,11 +242,11 @@ HAND_OFFSET = {
 
 
 class DatasetApp:
-    """Read-only view over one MultiFrequencyLeRobotDataset + caches."""
+    """Read-only view over one HumancoinLeRobotDataset + caches."""
 
     def __init__(self, root: Path):
         self.root = root
-        self.ds = MultiFrequencyLeRobotDataset(root.name, root=root)
+        self.ds = HumancoinLeRobotDataset(root.name, root=root)
         self.chunks_size = int(self.ds.meta.info.get("chunks_size", 1000))
         self._ep_cache: dict[int, tuple[np.ndarray, np.ndarray]] = {}
         self._video_cache: "OrderedDict[tuple, bytes]" = OrderedDict()
@@ -615,7 +615,7 @@ def main() -> None:
 
     root = args.root or default_root()
     if not (root / "meta" / "info.json").exists():
-        raise SystemExit(f"[error] '{root}' 不是 mf_lerobot 数据集 (缺 meta/info.json)")
+        raise SystemExit(f"[error] '{root}' 不是 humancoin_lerobot 数据集 (缺 meta/info.json)")
     if not HTML_PATH.exists():
         raise SystemExit(f"[error] 找不到前端页面 {HTML_PATH}")
 

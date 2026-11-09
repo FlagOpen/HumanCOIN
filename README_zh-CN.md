@@ -1,4 +1,4 @@
-# Multi-Frequency LeRobot Dataset
+# Humancoin LeRobot
 
 > 📖 English docs: [README.md](README.md)
 
@@ -8,7 +8,7 @@
 
 ## 目录
 
-- [Multi-Frequency LeRobot Dataset](#multi-frequency-lerobot-dataset)
+- [Humancoin LeRobot](#humancoin-lerobot)
   - [目录](#目录)
   - [1. 动机：为什么需要多频率支持](#1-动机为什么需要多频率支持)
   - [2. 安装](#2-安装)
@@ -53,7 +53,7 @@
 
 原生 LeRobotDataset 把所有数据压入一个合并 parquet，低频率传感器需要上采样、高频率传感器被截断或平均——丢失了原始时间精度。
 
-**mf_lerobot 的解决方案**：每个传感器独立存储为时间索引的 parquet 文件。读取时通过 `window` 参数定义"如何围绕查询时间戳聚合数据"——无需预先重采样。
+**humancoin_lerobot 的解决方案**：每个传感器独立存储为时间索引的 parquet 文件。读取时通过 `window` 参数定义"如何围绕查询时间戳聚合数据"——无需预先重采样。
 
 **写入** — `add_frame` 按 key 分流到对应 feature 缓冲，`save_episode()` 时各自落盘：
 
@@ -141,8 +141,8 @@ flowchart TD
 ## 2. 安装
 
 ```bash
-git clone https://github.com/Koorye/Multi-Frequency-LeRobot
-cd Multi-Frequency-LeRobot
+git clone https://github.com/RoboCoin-BAAI/HumanCoin-LeRobot
+cd HumanCoin-LeRobot
 pip install -e .
 
 # 依赖
@@ -164,9 +164,9 @@ pip install -r requirements.txt
 
 ```python
 import numpy as np
-from mf_lerobot import MultiFrequencyLeRobotDataset
+from humancoin_lerobot import HumancoinLeRobotDataset
 
-ds = MultiFrequencyLeRobotDataset.create(
+ds = HumancoinLeRobotDataset.create(
     repo_id="my_robot", root="data/", fps=30,
     features={
         # 相机：dtype="video" 自动编码为 MP4
@@ -225,7 +225,7 @@ ds.save_episode()
 **读取** — window feature 返回窗口内全部读数，nearest feature 返回最近邻单值：
 
 ```python
-ds = MultiFrequencyLeRobotDataset(repo_id="my_robot", root="data/")
+ds = HumancoinLeRobotDataset(repo_id="my_robot", root="data/")
 item = ds[10]
 
 item["observation.imu"]             # tensor([33, 6]) — (-0.033, 0] 内 33 个读数
@@ -498,7 +498,7 @@ ds.add_frame("observation.images.cam", image)
 "window": (-0.066, 0.0)   # (t-66ms, t], ~66 readings
 
 # 读取时动态覆盖
-ds = MultiFrequencyLeRobotDataset(
+ds = HumancoinLeRobotDataset(
     repo_id="my_robot", root="data/",
     window_overrides={"observation.imu": (-0.100, 0.0)},
 )
@@ -516,7 +516,7 @@ ds = MultiFrequencyLeRobotDataset(
 ### 创建数据集
 
 ```python
-ds = MultiFrequencyLeRobotDataset.create(
+ds = HumancoinLeRobotDataset.create(
     repo_id="my_robot",
     fps=30,
     features={...},          # 见下文 Feature 定义格式
@@ -610,7 +610,7 @@ ds.save_episode()    # 落盘全部 buffer，校验对齐/视频帧数，重置�
 ### 读取
 
 ```python
-ds = MultiFrequencyLeRobotDataset(
+ds = HumancoinLeRobotDataset(
     repo_id="robot", root="data/",
     episodes=[0, 2],                                    # 只加载 episode 0, 2
     image_transforms=my_transforms,                      # torchvision transforms
@@ -669,12 +669,12 @@ item = ds[10]
 ```mermaid
 flowchart TB
     subgraph Entry["入口层"]
-        DS["MultiFrequencyLeRobotDataset<br/>dataset.py · 编排器<br/>(继承 LeRobotDataset)"]
+        DS["HumancoinLeRobotDataset<br/>dataset.py · 编排器<br/>(继承 LeRobotDataset)"]
     end
 
     subgraph Core["核心层"]
         IX["MasterIndex<br/>index.py"]
-        MD["MultiFrequencyDatasetMetadata<br/>metadata.py"]
+        MD["HumancoinDatasetMetadata<br/>metadata.py"]
     end
 
     subgraph Features["特征层"]
@@ -725,13 +725,13 @@ flowchart TB
 **文件组织：**
 
 ```
-src/mf_lerobot/
+src/humancoin_lerobot/
 ├── dataset.py      (341行)  编排器 — add_frame / save_episode / __getitem__
 ├── audio.py        (185行)  AudioFeature — 缓冲音频块、写 WAV + 时间戳 parquet
 ├── parquet.py      (168行)  ParquetFeature — 写缓冲、存 parquet、加载、窗口查询
 ├── video.py        (168行)  VideoFeature — 存 PNG、编码 MP4、解码帧
 ├── index.py        (127行)  MasterIndex — 帧索引的读写
-├── metadata.py     (123行)  MultiFrequencyDatasetMetadata — info.json 管理
+├── metadata.py     (123行)  HumancoinDatasetMetadata — info.json 管理
 ├── checker.py      (162行)  DatasetChecker — 视频帧数 + 音频完整性 + 时间戳对齐校验
 └── utils.py        (236行)  常量 + info.json 创建/校验
 ```
@@ -748,7 +748,7 @@ src/mf_lerobot/
 
 ## 8. 与原生 LeRobotDataset 对比
 
-| 特性 | 原生 LeRobotDataset | mf_lerobot |
+| 特性 | 原生 LeRobotDataset | humancoin_lerobot |
 |------|-------------------|------------|
 | 存储 | 1 个合并 parquet | N 个 per-feature parquet |
 | 多频率传感器 | 需要预先重采样 | 原生速率，独立存储 |

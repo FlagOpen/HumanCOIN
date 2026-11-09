@@ -3,7 +3,7 @@
 import shutil
 from pathlib import Path
 import numpy as np
-from mf_lerobot import MultiFrequencyLeRobotDataset
+from humancoin_lerobot import HumancoinLeRobotDataset
 
 root = Path(__file__).parent.parent / "data" / "delta_demo"
 if root.exists():
@@ -11,7 +11,7 @@ if root.exists():
 
 FPS = 30
 
-ds = MultiFrequencyLeRobotDataset.create(
+ds = HumancoinLeRobotDataset.create(
     repo_id="delta_demo", fps=FPS,
     features={
         "observation.state": {
@@ -38,7 +38,7 @@ for i in range(60):
 ds.save_episode()
 
 # Load with delta_timestamps: query state at t-0.1, t, t+0.1
-ds2 = MultiFrequencyLeRobotDataset(
+ds2 = HumancoinLeRobotDataset(
     repo_id="delta_demo", root=root,
     delta_timestamps={"observation.state": [-0.1, 0.0, 0.1]},
 )

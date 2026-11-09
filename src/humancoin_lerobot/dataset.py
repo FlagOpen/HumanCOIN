@@ -1,4 +1,4 @@
-"""Multi-frequency LeRobot dataset.
+"""Humancoin LeRobot dataset.
 
 Extends LeRobotDataset with per-field add_frame and per-feature parquet storage.
 Each non-video feature is backed by a ParquetFeature; cameras by VideoFeature;
@@ -21,13 +21,13 @@ from .parquet import ParquetFeature
 from .video import VideoFeature
 from .audio import AudioFeature
 from .index import MasterIndex
-from .metadata import MultiFrequencyDatasetMetadata
+from .metadata import HumancoinDatasetMetadata
 from .utils import DEFAULT_FEATURES
 
 logger = logging.getLogger(__name__)
 
 
-class MultiFrequencyLeRobotDataset(LeRobotDataset):
+class HumancoinLeRobotDataset(LeRobotDataset):
     """LeRobot dataset with per-field add_frame for multi-frequency sensors."""
 
     def __init__(
@@ -58,7 +58,7 @@ class MultiFrequencyLeRobotDataset(LeRobotDataset):
         self.episodes_since_last_encoding = 0
         self.save_threads = max(1, int(save_threads))
 
-        self.meta = MultiFrequencyDatasetMetadata(self.repo_id, self.root)
+        self.meta = HumancoinDatasetMetadata(self.repo_id, self.root)
         self.index = MasterIndex(self)
         self.hf_dataset = self.index.load_hf_dataset()
         if episodes is not None:
@@ -126,12 +126,12 @@ class MultiFrequencyLeRobotDataset(LeRobotDataset):
         batch_encoding_size: int = 1,
         window_overrides: dict[str, tuple | str | None] | None = None,
         save_threads: int = 1,
-    ) -> "MultiFrequencyLeRobotDataset":
+    ) -> "HumancoinLeRobotDataset":
         root = Path(root) if root else (
             Path.home() / ".cache" / "huggingface" / "lerobot" / repo_id
         )
 
-        meta = MultiFrequencyDatasetMetadata.create(
+        meta = HumancoinDatasetMetadata.create(
             repo_id=repo_id, fps=fps, features=features,
             robot_type=robot_type, root=root, use_videos=use_videos,
         )

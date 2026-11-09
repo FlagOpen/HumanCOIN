@@ -4,7 +4,7 @@ import json
 import shutil
 from pathlib import Path
 import numpy as np
-from mf_lerobot import MultiFrequencyLeRobotDataset
+from humancoin_lerobot import HumancoinLeRobotDataset
 
 root = Path(__file__).parent.parent / "data" / "tolerance_demo"
 if root.exists():
@@ -12,7 +12,7 @@ if root.exists():
 
 FPS = 30
 
-ds = MultiFrequencyLeRobotDataset.create(
+ds = HumancoinLeRobotDataset.create(
     repo_id="tolerance_demo", fps=FPS,
     features={
         "observation.imu": {

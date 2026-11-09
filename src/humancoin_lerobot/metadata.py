@@ -1,4 +1,4 @@
-"""Multi-frequency dataset metadata — mirrors LeRobotDatasetMetadata."""
+"""Humancoin LeRobot dataset metadata — mirrors LeRobotDatasetMetadata."""
 
 from pathlib import Path
 
@@ -12,7 +12,7 @@ from .utils import (
 )
 
 
-class MultiFrequencyDatasetMetadata(LeRobotDatasetMetadata):
+class HumancoinDatasetMetadata(LeRobotDatasetMetadata):
     """Extended metadata for multi-frequency datasets."""
 
     def load_metadata(self):
@@ -65,7 +65,7 @@ class MultiFrequencyDatasetMetadata(LeRobotDatasetMetadata):
         robot_type: str | None = None,
         root: str | Path | None = None,
         use_videos: bool = True,
-    ) -> "MultiFrequencyDatasetMetadata":
+    ) -> "HumancoinDatasetMetadata":
         obj = cls.__new__(cls)
         obj.repo_id = repo_id
         obj.root = (

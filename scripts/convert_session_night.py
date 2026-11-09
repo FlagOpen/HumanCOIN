@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Convert Embodied-Brain-Collect ``session-night`` recordings into an mf_lerobot dataset.
+"""Convert Embodied-Brain-Collect ``session-night`` recordings into an humancoin_lerobot dataset.
 
 Usage::
 
@@ -53,7 +53,7 @@ import numpy as np
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from mf_lerobot import MultiFrequencyLeRobotDataset  # noqa: E402
+from humancoin_lerobot import HumancoinLeRobotDataset  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SOURCE = Path("/home/baai/Projects/Embodied-Brain-Collect/data/session-night")
@@ -542,7 +542,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(f"[spec] {len(specs)} 个特征: " + ", ".join(specs))
 
-    ds = MultiFrequencyLeRobotDataset.create(
+    ds = HumancoinLeRobotDataset.create(
         repo_id=args.out.name, fps=MASTER_FPS, features=specs,
         root=args.out, use_videos=True,
     )

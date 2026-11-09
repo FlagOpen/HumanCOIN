@@ -3,7 +3,7 @@
 import shutil
 from pathlib import Path
 import numpy as np
-from mf_lerobot import MultiFrequencyLeRobotDataset
+from humancoin_lerobot import HumancoinLeRobotDataset
 
 root = Path(__file__).parent.parent / "data" / "window_demo"
 if root.exists():
@@ -11,7 +11,7 @@ if root.exists():
 
 FPS = 30
 
-ds = MultiFrequencyLeRobotDataset.create(
+ds = HumancoinLeRobotDataset.create(
     repo_id="window_demo", fps=FPS,
     features={
         "observation.imu": {
@@ -73,7 +73,7 @@ temp = item["observation.temperature"]
 print(f"  Temperature [nearest]: {temp.item():.1f}°C")
 
 print("\n=== Read-time window override ===")
-ds2 = MultiFrequencyLeRobotDataset(
+ds2 = HumancoinLeRobotDataset(
     repo_id="window_demo", root=root,
     window_overrides={
         "observation.imu": (-0.066, 0.0),           # 2× wider
