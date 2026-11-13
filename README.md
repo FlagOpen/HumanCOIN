@@ -1,14 +1,14 @@
-# Humancoin LeRobot
+# HumanCOIN-LeRobot
 
 > 📖 中文文档：[README_zh-CN.md](README_zh-CN.md)
 
-**LeRobot multi-frequency sensor dataset extension** — heterogeneous sensors are stored at their independent sampling rates, one parquet file per sensor, dynamically aligned by time window at query time.
+**A multi-sensor, multi-frequency dataset extension for real-world data, built on LeRobot** — sensors are stored at their independent sampling rates, one parquet file per sensor, dynamically aligned by time window at query time.
 
 ---
 
 ## Table of Contents
 
-- [Humancoin LeRobot](#humancoin-lerobot)
+- [HumanCOIN-LeRobot](#humancoin-lerobot)
   - [Table of Contents](#table-of-contents)
   - [1. Motivation: Why Multi-Frequency Support](#1-motivation-why-multi-frequency-support)
   - [2. Installation](#2-installation)
@@ -42,16 +42,18 @@
 
 ## 1. Motivation: Why Multi-Frequency Support
 
-Real robot systems typically include a variety of sensors with wildly different sampling rates:
+Real-world data collection often requires multiple sensors to capture the same process: cameras record visual information, IMUs measure motion, and EEG and EMG capture physiological signals. Human behavior research, wearable devices, experimental recording, and environmental sensing all involve combining such data. Sensors differ in sampling rate, startup time, and data format, so their individual time series need to be preserved and aligned when used.
+
+Common sensors operate at very different sampling rates:
 
 | Sensor | Typical rate | Shape | Example |
 |--------|---------|------|------|
-| Camera RGB | 30 / 60 Hz | 480×640×3 | head camera + wrist camera |
+| Camera RGB | 30 / 60 Hz | 480×640×3 | scene camera + wearable camera |
 | IMU | 50-1000 Hz | 6 (accel×3 + gyro×3) | accelerometer + gyroscope |
 | EEG | 256 / 512 / 1000 Hz | 8-256 channels | brain signals |
 | EMG | 20-500 Hz | 4-16 channels | muscle signals |
 
-The native LeRobotDataset squeezes everything into one merged parquet: low-rate sensors have to be upsampled, high-rate sensors get truncated or averaged — the original time precision is lost.
+Forcing streams with different sampling rates into a table at a single frame rate typically requires upsampling low-rate data and downsampling or aggregating high-rate data, which can discard original samples. This project builds on LeRobot’s dataset infrastructure to support independent sensor storage and time-based queries.
 
 **The humancoin_lerobot solution**: every sensor is stored independently as a time-indexed parquet file. At read time, a `window` parameter defines "how to aggregate data around the query timestamp" — no pre-resampling needed.
 
@@ -140,14 +142,31 @@ The result of `ds[10]` (t=0.333s):
 
 ## 2. Installation
 
-```bash
-git clone https://github.com/RoboCoin-BAAI/HumanCoin-LeRobot
-cd HumanCoin-LeRobot
-pip install -e .
+Python **3.10–3.13** (verified with Python 3.12). LeRobot is currently pinned to **0.3.3**.
 
-# dependencies
-pip install -r requirements.txt
+Install from [PyPI](https://pypi.org/project/humancoin-lerobot/):
+
+```bash
+pip install humancoin-lerobot
 ```
+
+Or install from source:
+
+```bash
+git clone https://github.com/RoboCoin-BAAI/HumanCOIN-LeRobot
+cd HumanCOIN-LeRobot
+pip install -e .
+# Optional: both visualizers and recording conversion
+pip install -e ".[visualization,conversion]"
+```
+
+To install a locally built wheel:
+
+```bash
+pip install dist/humancoin_lerobot-0.1.1-py3-none-any.whl
+```
+
+Starting with version 0.1.1, both Hugging Face and ModelScope downloads are included by default. Runtime dependencies are declared in the package; a separate requirements install is not needed for data reading/writing. CPU operation is supported.
 
 Dependencies:
 
@@ -156,9 +175,43 @@ Dependencies:
 | `lerobot` | base dataset framework (inherits LeRobotDataset) |
 | `pyarrow` | parquet file I/O |
 | `numpy` / `torch` | data processing |
-| `pyav` | video encoding/decoding |
+| `av` (PyAV) | video encoding/decoding |
 | `matplotlib` | visualization (optional) |
-| `h5py` | HDF5 data reading (optional) |
+| `scipy` | web visualizer signal filtering (optional) |
+| `PyYAML` | recording conversion (optional) |
+
+### Download HumanCOIN datasets
+
+Browse dataset names on [Hugging Face](https://huggingface.co/HumanCOIN) or [ModelScope](https://www.modelscope.cn/organization/HumanCOIN). These are organization pages; pass a dataset name from the selected hub to the command below.
+
+```bash
+pip install humancoin-lerobot
+
+# Replace DATASET_NAME with an actual dataset repository name
+humancoin-download --hub huggingface --datasets DATASET_NAME --target-dir ./data
+humancoin-download --hub modelscope --datasets DATASET_NAME --target-dir ./data
+
+# Download only selected files (partial download; may not be loadable as a full dataset)
+humancoin-download --datasets DATASET_NAME --include "meta/*" README.md --target-dir ./data
+
+# Multiple datasets; preview without downloading
+humancoin-download --datasets DATASET_A DATASET_B --target-dir ./data --dry-run
+# Also available as: python -m humancoin_lerobot.download ...
+```
+
+The default namespace is `HumanCOIN`; explicit `owner/name` IDs are also accepted. `--ds_lists` is an alias for `--datasets`. Files are stored under `<target-dir>/HumanCOIN/<dataset-name>`; the default target directory is `~/.cache/huggingface/lerobot`. Repeating a download reuses files through the hub SDK. Use `--revision` to select a version and `--max-workers` to control parallel downloads. Private/gated datasets require access and `HF_TOKEN` or `MODELSCOPE_TOKEN` (or `--token`); ModelScope uses the lightweight `modelscope-hub` SDK; credentials are passed to the client or read from its login cache. `MS_TOKEN` is also accepted. A failed dataset does not stop the remaining downloads; the command exits nonzero if any fail.
+
+```python
+from humancoin_lerobot import HumancoinLeRobotDataset
+
+ds = HumancoinLeRobotDataset(
+    repo_id="HumanCOIN/DATASET_NAME",
+    root="data/HumanCOIN/DATASET_NAME",
+)
+item = ds[0]
+```
+
+Downloads preserve the repository files; loading requires the multi-frequency dataset layout supported by this project. Downloading does not convert other formats.
 
 ## 3. Quick Start
 
@@ -167,7 +220,7 @@ import numpy as np
 from humancoin_lerobot import HumancoinLeRobotDataset
 
 ds = HumancoinLeRobotDataset.create(
-    repo_id="my_robot", root="data/", fps=30,
+    repo_id="my_dataset", root="data/", fps=30,
     features={
         # camera: dtype="video" auto-encodes to MP4
         "observation.images.cam": {
@@ -225,7 +278,7 @@ ds.save_episode()
 **Reading** — window features return all readings in the window, nearest features return a single vector:
 
 ```python
-ds = HumancoinLeRobotDataset(repo_id="my_robot", root="data/")
+ds = HumancoinLeRobotDataset(repo_id="my_dataset", root="data/")
 item = ds[10]
 
 item["observation.imu"]             # tensor([33, 6]) — 33 readings in (-0.033, 0]
@@ -295,7 +348,7 @@ It also renders a 3D pose view in the SteamVR right-handed y-up world (`*_pose` 
 
 ### 4.2 Demo 1: Writing (01write_simple.py)
 
-The main write demo: a full simulated robot — 3 cameras + IMU + EEG + EMG + temperature — recording three 2-second episodes (`reach_target`, `pour_liquid`, `stack_blocks`):
+The main write demo: a set of simulated sensor streams — 3 cameras + IMU + EEG + EMG + temperature — recording three 2-second episodes (`reach_target`, `pour_liquid`, `stack_blocks`):
 
 | Sensor | Shape | Rate | Window |
 |--------|------|------|--------|
@@ -500,7 +553,7 @@ The master-clock frame timestamp is the query anchor, but a feature's readings d
 
 # override at read time
 ds = HumancoinLeRobotDataset(
-    repo_id="my_robot", root="data/",
+    repo_id="my_dataset", root="data/",
     window_overrides={"observation.imu": (-0.100, 0.0)},
 )
 ```
@@ -518,7 +571,7 @@ Note that temperature (10Hz) has no sample at 0.333 — its sampling grid is 0.3
 
 ```python
 ds = HumancoinLeRobotDataset.create(
-    repo_id="my_robot",
+    repo_id="my_dataset",
     fps=30,
     features={...},          # see Feature Definition Format below
 )
@@ -612,7 +665,7 @@ ds.save_episode()    # flush all buffers, run alignment/video checks, reset coun
 
 ```python
 ds = HumancoinLeRobotDataset(
-    repo_id="robot", root="data/",
+    repo_id="my_dataset", root="data/",
     episodes=[0, 2],                                    # load only episodes 0, 2
     image_transforms=my_transforms,                      # torchvision transforms
     delta_timestamps={"observation.state": [-0.1, 0, 0.1]},  # multi-frame query
@@ -633,6 +686,8 @@ item = ds[10]
 | `video_backend` | `str` | `None` | video decoding backend (e.g. `"pyav"`) |
 | `batch_encoding_size` | `int` | `1` | (write side) video batch-encoding size |
 | `window_overrides` | `dict` | `None` | override each feature's window at read time, e.g. `{"observation.imu": (-0.066, 0)}` |
+
+Depth video reading: features with `info["video.is_depth_map"] = true` and HWC `shape = [H, W, 1]` are decoded directly with PyAV. Reads return native samples as a `(1, H, W)` tensor (e.g. `uint16` for `gray12le`), without RGB conversion or division by 255. Units and invalid values remain those of the stored data. This applies to reading; depth-specific encoding is not implemented.
 
 ### Return Structure
 
@@ -779,3 +834,15 @@ This project builds on the following open-source projects and work:
 - The [Neuropixels](https://www.neuropixels.org/) data format and the BIDS standard from the **[Allen Institute for Neural Dynamics](https://alleninstitute.org/division/neural-dynamics/)** — inspiration for organizing multimodal neural data.
 
 Thanks to all colleagues for feedback and discussions.
+
+
+## Building and checking a release
+
+```bash
+pip install -e ".[dev]"
+python -m unittest discover -s tests -v
+python -m build
+python -m twine check dist/*
+```
+
+The wheel contains the `humancoin_lerobot` package and `humancoin-download` command. The repository's `scripts/` and `examples/` remain source tools. Private/gated downloads require both a valid token and access approval on the chosen platform; a token alone does not grant access. PyPI publishing is a separate step.

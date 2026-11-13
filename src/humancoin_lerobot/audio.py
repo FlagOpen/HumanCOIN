@@ -108,10 +108,10 @@ class AudioFeature:
         arrays = [self._chunks[i] for i in indices if len(self._chunks[i]) > 0]
         if not arrays:
             return None
-        stacked = np.stack(
+        stacked = np.concatenate(
             [a if a.ndim == 2 else a[:, None] for a in arrays], axis=0
-        )  # [S, N, C]
-        axes = (0, 1)  # reduce over sampled chunks and samples — keep channel
+        )  # [total sampled samples, C]; chunks need not have equal lengths
+        axes = 0  # reduce over samples — keep channel
         total = sum(len(c) for c in self._chunks)
         return {
             "min": stacked.min(axis=axes),

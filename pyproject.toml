@@ -1,10 +1,39 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "humancoin_lerobot"
-version = "0.1.0"
+name = "humancoin-lerobot"
+version = "0.1.1"
+description = "Multi-frequency sensor datasets with independent storage and time-aligned queries, built on LeRobot"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+dependencies = [
+    "lerobot==0.3.3",
+    "numpy>=1.24,<3",
+    "torch>=2.2.1,<2.8",
+    "datasets>=2.19,<=3.6.0",
+    "pyarrow>=14",
+    "av>=14.2",
+    "Pillow>=10",
+    "huggingface-hub>=0.34.2,<1",
+    "modelscope-hub>=0.7.1,<1",
+]
+
+[project.urls]
+Homepage = "https://github.com/RoboCoin-BAAI/HumanCOIN-LeRobot"
+Repository = "https://github.com/RoboCoin-BAAI/HumanCOIN-LeRobot"
+Issues = "https://github.com/RoboCoin-BAAI/HumanCOIN-LeRobot/issues"
+
+[project.optional-dependencies]
+visualization = ["matplotlib>=3.8", "scipy>=1.11"]
+conversion = ["PyYAML>=6"]
+dev = ["build>=1.2", "twine>=6"]
+
+[project.scripts]
+humancoin-download = "humancoin_lerobot.download:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

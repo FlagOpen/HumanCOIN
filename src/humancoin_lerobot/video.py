@@ -125,6 +125,47 @@ class VideoFeature:
         self._frame_count = 0
         self._timestamps = []
 
+    @property
+    def is_depth(self) -> bool:
+        """Depth requires both an explicit marker and an HWC single channel."""
+        shape = self.spec.get("shape", ())
+        return (
+            self.spec.get("info", {}).get("video.is_depth_map", False) is True
+            and len(shape) == 3 and shape[2] == 1
+        )
+
+    def _read_depth(self, video_path: Path, idx: int, fps: float) -> torch.Tensor:
+        """Decode native grayscale samples, without RGB conversion or scaling."""
+        import av
+
+        target = idx / fps
+        with av.open(str(video_path)) as container:
+            stream = container.streams.video[0]
+            start = stream.start_time or 0
+            container.seek(
+                start + int(target / stream.time_base), stream=stream,
+                backward=True, any_frame=False,
+            )
+            closest = None
+            gap = float("inf")
+            for frame in container.decode(stream):
+                if frame.pts is None:
+                    continue
+                t = float((frame.pts - start) * stream.time_base)
+                distance = abs(t - target)
+                if distance < gap:
+                    closest, gap = frame, distance
+                if t >= target:
+                    break
+            if closest is None or gap >= max(self._tolerance_s, 0.5 / fps):
+                raise ValueError(f"No depth frame near {target}s in {video_path}")
+            if len(closest.format.components) != 1:
+                raise ValueError(f"Expected single-channel depth in {video_path}")
+            samples = closest.to_ndarray()
+            if samples.shape != tuple(self.spec["shape"][:2]):
+                raise ValueError(f"Depth shape {samples.shape} differs from metadata in {video_path}")
+            return torch.from_numpy(samples.copy()).unsqueeze(0)
+
     def read(self, ep_idx: int, timestamp: float) -> torch.Tensor:
         """Frame whose stored timestamp is nearest to ``timestamp``.
 
@@ -141,9 +182,13 @@ class VideoFeature:
         ts = self._load_timestamps(ep_idx)
         if len(ts) == 0:
             shape = self.spec.get("shape", (0, 0, 3))
+            if self.is_depth:
+                raise ValueError(f"No depth timestamps for {self.key}, episode {ep_idx}")
             return torch.zeros(3, shape[0], shape[1], dtype=torch.uint8)
         fps = float(self.spec.get("fps", 30) or 30)
         idx = int(np.argmin(np.abs(ts - timestamp)))
+        if self.is_depth:
+            return self._read_depth(video_path, idx, fps)
         from lerobot.datasets.video_utils import decode_video_frames
         frames = decode_video_frames(
             video_path, [idx / fps],

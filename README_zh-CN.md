@@ -1,14 +1,14 @@
-# Humancoin LeRobot
+# HumanCOIN-LeRobot
 
 > 📖 English docs: [README.md](README.md)
 
-**LeRobot 多频率传感器数据集扩展** — 异构传感器以独立采样率存储，每个传感器一个 parquet 文件，查询时按时间窗口动态对齐。
+**面向真实场景的多传感器、多频率数据集扩展，基于 LeRobot 构建** — 各传感器按独立采样率存储，每个传感器一个 parquet 文件，查询时按时间窗口动态对齐。
 
 ---
 
 ## 目录
 
-- [Humancoin LeRobot](#humancoin-lerobot)
+- [HumanCOIN-LeRobot](#humancoin-lerobot)
   - [目录](#目录)
   - [1. 动机：为什么需要多频率支持](#1-动机为什么需要多频率支持)
   - [2. 安装](#2-安装)
@@ -42,16 +42,18 @@
 
 ## 1. 动机：为什么需要多频率支持
 
-真实机器人系统通常包含多种传感器，采样率差异巨大：
+真实场景的数据采集往往需要多种传感器共同记录同一过程：相机记录视觉信息，IMU 记录运动，EEG 和 EMG 记录生理信号。人体行为研究、可穿戴设备、实验记录和环境感知等场景，都需要联合使用这些数据。不同传感器的采样率、启动时间和数据形态各不相同，因此需要保留各自的时间序列，并在使用时按时间对齐。
+
+常见传感器的采样率差异很大：
 
 | 传感器 | 典型频率 | 维度 | 示例 |
 |--------|---------|------|------|
-| 相机 RGB | 30 / 60 Hz | 480×640×3 | 头部相机 + 腕部相机 |
+| 相机 RGB | 30 / 60 Hz | 480×640×3 | 场景相机 + 可穿戴相机 |
 | IMU | 50-1000 Hz | 6 (accel×3 + gyro×3) | 加速度计 + 陀螺仪 |
 | EEG | 256 / 512 / 1000 Hz | 8-256 通道 | 脑电信号 |
 | EMG | 20-500 Hz | 4-16 通道 | 肌电信号 |
 
-原生 LeRobotDataset 把所有数据压入一个合并 parquet，低频率传感器需要上采样、高频率传感器被截断或平均——丢失了原始时间精度。
+将不同频率的数据强制合并到统一帧率的表中，通常需要对低频数据上采样、对高频数据降采样或聚合，这可能损失原始采样信息。本项目基于 LeRobot 的数据集基础设施，扩展了按传感器独立存储和按时间查询的能力。
 
 **humancoin_lerobot 的解决方案**：每个传感器独立存储为时间索引的 parquet 文件。读取时通过 `window` 参数定义"如何围绕查询时间戳聚合数据"——无需预先重采样。
 
@@ -140,14 +142,31 @@ flowchart TD
 
 ## 2. 安装
 
-```bash
-git clone https://github.com/RoboCoin-BAAI/HumanCoin-LeRobot
-cd HumanCoin-LeRobot
-pip install -e .
+Python **3.10–3.13**（已在 Python 3.12 验证），当前固定依赖 **LeRobot 0.3.3**。
 
-# 依赖
-pip install -r requirements.txt
+从 [PyPI](https://pypi.org/project/humancoin-lerobot/) 安装：
+
+```bash
+pip install humancoin-lerobot
 ```
+
+也可以从源码安装：
+
+```bash
+git clone https://github.com/RoboCoin-BAAI/HumanCOIN-LeRobot
+cd HumanCOIN-LeRobot
+pip install -e .
+# 可选：桌面/网页可视化与采集数据转换
+pip install -e ".[visualization,conversion]"
+```
+
+安装本地构建的 wheel：
+
+```bash
+pip install dist/humancoin_lerobot-0.1.1-py3-none-any.whl
+```
+
+从 0.1.1 起，默认包含 Hugging Face 和魔搭两种下载支持。运行依赖已在包中声明，数据读写无需额外安装 requirements。支持 CPU 运行。
 
 依赖说明：
 
@@ -156,9 +175,43 @@ pip install -r requirements.txt
 | `lerobot` | 基础数据集框架（继承 LeRobotDataset） |
 | `pyarrow` | parquet 文件读写 |
 | `numpy` / `torch` | 数据处理 |
-| `pyav` | 视频编码/解码 |
+| `av`（PyAV） | 视频编码/解码 |
 | `matplotlib` | 可视化（可选） |
-| `h5py` | HDF5 数据读取（可选） |
+| `scipy` | 网页可视化信号滤波（可选） |
+| `PyYAML` | 采集数据转换（可选） |
+
+### 下载 HumanCOIN 数据集
+
+在 [Hugging Face](https://huggingface.co/HumanCOIN) 或 [ModelScope](https://www.modelscope.cn/organization/HumanCOIN) 浏览数据集。这两个地址是组织页面，下载时需指定所选平台上的具体数据集名称。
+
+```bash
+pip install humancoin-lerobot
+
+# 将 DATASET_NAME 替换为实际数据集仓库名
+humancoin-download --hub huggingface --datasets DATASET_NAME --target-dir ./data
+humancoin-download --hub modelscope --datasets DATASET_NAME --target-dir ./data
+
+# 仅下载指定文件（部分下载，不保证能够加载完整数据集）
+humancoin-download --datasets DATASET_NAME --include "meta/*" README.md --target-dir ./data
+
+# 批量指定数据集；仅预览计划，不下载
+humancoin-download --datasets DATASET_A DATASET_B --target-dir ./data --dry-run
+# 也可使用：python -m humancoin_lerobot.download ...
+```
+
+默认组织为 `HumanCOIN`，也支持显式传入 `owner/name`。`--ds_lists` 是 `--datasets` 的别名。保存路径为 `<target-dir>/HumanCOIN/<数据集名>`，默认目标目录为 `~/.cache/huggingface/lerobot`。重复执行时由平台 SDK 复用已下载文件；可用 `--revision` 指定版本、`--max-workers` 设置下载并发数。私有或受限数据集需要账号具备访问权限，并通过 `HF_TOKEN`、`MODELSCOPE_TOKEN` 或 `--token` 提供凭据；ModelScope 使用轻量 `modelscope-hub` SDK，通过客户端传入凭据或读取其登录缓存，也兼容 `MS_TOKEN`。单个数据集失败后仍继续下载其余数据集，存在失败时命令返回非零退出码。
+
+```python
+from humancoin_lerobot import HumancoinLeRobotDataset
+
+ds = HumancoinLeRobotDataset(
+    repo_id="HumanCOIN/DATASET_NAME",
+    root="data/HumanCOIN/DATASET_NAME",
+)
+item = ds[0]
+```
+
+下载保留远端原始文件；加载要求数据集符合本项目支持的多频率目录结构，下载过程不会自动转换其他格式。
 
 ## 3. 快速开始
 
@@ -167,7 +220,7 @@ import numpy as np
 from humancoin_lerobot import HumancoinLeRobotDataset
 
 ds = HumancoinLeRobotDataset.create(
-    repo_id="my_robot", root="data/", fps=30,
+    repo_id="my_dataset", root="data/", fps=30,
     features={
         # 相机：dtype="video" 自动编码为 MP4
         "observation.images.cam": {
@@ -225,7 +278,7 @@ ds.save_episode()
 **读取** — window feature 返回窗口内全部读数，nearest feature 返回最近邻单值：
 
 ```python
-ds = HumancoinLeRobotDataset(repo_id="my_robot", root="data/")
+ds = HumancoinLeRobotDataset(repo_id="my_dataset", root="data/")
 item = ds[10]
 
 item["observation.imu"]             # tensor([33, 6]) — (-0.033, 0] 内 33 个读数
@@ -295,7 +348,7 @@ python -m examples.06audio_example
 
 ### 4.2 Demo 1：写入（01write_simple.py）
 
-主写 demo：一个完整的模拟机器人 —— 3 路相机 + IMU + EEG + EMG + temperature，录制三个 2 秒 episode（`reach_target`、`pour_liquid`、`stack_blocks`）：
+主写 demo：一组模拟的多传感器数据流 —— 3 路相机 + IMU + EEG + EMG + temperature，录制三个 2 秒 episode（`reach_target`、`pour_liquid`、`stack_blocks`）：
 
 | 传感器 | 维度 | 频率 | Window |
 |--------|------|------|--------|
@@ -499,7 +552,7 @@ ds.add_frame("observation.images.cam", image)
 
 # 读取时动态覆盖
 ds = HumancoinLeRobotDataset(
-    repo_id="my_robot", root="data/",
+    repo_id="my_dataset", root="data/",
     window_overrides={"observation.imu": (-0.100, 0.0)},
 )
 ```
@@ -517,7 +570,7 @@ ds = HumancoinLeRobotDataset(
 
 ```python
 ds = HumancoinLeRobotDataset.create(
-    repo_id="my_robot",
+    repo_id="my_dataset",
     fps=30,
     features={...},          # 见下文 Feature 定义格式
 )
@@ -611,7 +664,7 @@ ds.save_episode()    # 落盘全部 buffer，校验对齐/视频帧数，重置�
 
 ```python
 ds = HumancoinLeRobotDataset(
-    repo_id="robot", root="data/",
+    repo_id="my_dataset", root="data/",
     episodes=[0, 2],                                    # 只加载 episode 0, 2
     image_transforms=my_transforms,                      # torchvision transforms
     delta_timestamps={"observation.state": [-0.1, 0, 0.1]},  # 多帧查询
@@ -632,6 +685,8 @@ item = ds[10]
 | `video_backend` | `str` | `None` | 视频解码后端（如 `"pyav"`） |
 | `batch_encoding_size` | `int` | `1` | （写入侧）视频批量编码大小 |
 | `window_overrides` | `dict` | `None` | 读取时覆盖各 feature 的 window，如 `{"observation.imu": (-0.066, 0)}` |
+
+深度视频读取：当特征的 `info["video.is_depth_map"] = true` 且 HWC `shape = [H, W, 1]` 时，直接使用 PyAV 解码，返回保留原始数值的 `(1, H, W)` 张量（如 `gray12le` 返回 `uint16`），不转换 RGB、不除以 255。单位和无效值沿用原始数据定义。此功能仅针对读取，尚未实现深度专用编码。
 
 ### 读取返回结构
 
@@ -778,3 +833,15 @@ src/humancoin_lerobot/
 - **[Allen Institute for Neural Dynamics](https://alleninstitute.org/division/neural-dynamics/)** 的 [Neuropixels](https://www.neuropixels.org/) 数据格式与 BIDS 标准 — 多模态神经数据组织方式的灵感来源。
 
 感谢所有反馈与讨论的同事。
+
+
+## 构建与发布检查
+
+```bash
+pip install -e ".[dev]"
+python -m unittest discover -s tests -v
+python -m build
+python -m twine check dist/*
+```
+
+wheel 包含 `humancoin_lerobot` 和 `humancoin-download` 命令；`scripts/` 与 `examples/` 仍需从源码运行。私有或 Gated 数据集需要有效 Token 和平台访问授权，仅持有 Token 不代表已经获准访问。发布到 PyPI 需要另行执行。
