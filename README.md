@@ -156,17 +156,9 @@ Or install from source:
 git clone https://github.com/RoboCoin-BAAI/HumanCOIN-LeRobot
 cd HumanCOIN-LeRobot
 pip install -e .
-# Optional: both visualizers and recording conversion
-pip install -e ".[visualization,conversion]"
+# Optional: desktop and web visualization
+pip install -e ".[visualization]"
 ```
-
-To install a locally built wheel:
-
-```bash
-pip install dist/humancoin_lerobot-0.1.1-py3-none-any.whl
-```
-
-Starting with version 0.1.1, both Hugging Face and ModelScope downloads are included by default. Runtime dependencies are declared in the package; a separate requirements install is not needed for data reading/writing. CPU operation is supported.
 
 Dependencies:
 
@@ -178,7 +170,6 @@ Dependencies:
 | `av` (PyAV) | video encoding/decoding |
 | `matplotlib` | visualization (optional) |
 | `scipy` | web visualizer signal filtering (optional) |
-| `PyYAML` | recording conversion (optional) |
 
 ### Download HumanCOIN datasets
 

@@ -156,17 +156,9 @@ pip install humancoin-lerobot
 git clone https://github.com/RoboCoin-BAAI/HumanCOIN-LeRobot
 cd HumanCOIN-LeRobot
 pip install -e .
-# 可选：桌面/网页可视化与采集数据转换
-pip install -e ".[visualization,conversion]"
+# 可选：桌面/网页可视化
+pip install -e ".[visualization]"
 ```
-
-安装本地构建的 wheel：
-
-```bash
-pip install dist/humancoin_lerobot-0.1.1-py3-none-any.whl
-```
-
-从 0.1.1 起，默认包含 Hugging Face 和魔搭两种下载支持。运行依赖已在包中声明，数据读写无需额外安装 requirements。支持 CPU 运行。
 
 依赖说明：
 
@@ -178,7 +170,6 @@ pip install dist/humancoin_lerobot-0.1.1-py3-none-any.whl
 | `av`（PyAV） | 视频编码/解码 |
 | `matplotlib` | 可视化（可选） |
 | `scipy` | 网页可视化信号滤波（可选） |
-| `PyYAML` | 采集数据转换（可选） |
 
 ### 下载 HumanCOIN 数据集
 
