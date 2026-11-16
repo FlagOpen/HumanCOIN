@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from humancoin_lerobot import HumancoinLeRobotDataset
+from humancoin import HumanCOINDataset
 
 FPS = 30
 SAMPLE_RATE = 16000
@@ -47,7 +47,7 @@ if root.exists():
 
 samples_per_frame = SAMPLE_RATE // FPS  # 533 samples ≈ 33ms per master frame
 
-ds = HumancoinLeRobotDataset.create(
+ds = HumanCOINDataset.create(
     repo_id="robot_audio_demo", fps=FPS,
     features={
         "observation.images.cam": {
@@ -94,7 +94,7 @@ print(f"  {ts_path.relative_to(root)}: timestamp parquet index")
 # ── Read back ──
 
 print("\nReading back:")
-ds = HumancoinLeRobotDataset(repo_id="robot_audio_demo", root=root)
+ds = HumanCOINDataset(repo_id="robot_audio_demo", root=root)
 item = ds[10]
 print(f"  ds[10] (t={item['timestamp'].item():.3f}s):")
 print(f"    observation.audio.mic          → {tuple(item['observation.audio.mic'].shape)} "
@@ -115,7 +115,7 @@ print(f"    read(0, 1.23,   window=(-0.33, 0))   → {tuple(w33.shape)} "
       f"(期望 ~{int(0.33 * SAMPLE_RATE)} 采样 = 330ms)")
 
 # window_overrides at load time — same data, wider window, no rewrite
-ds_wide = HumancoinLeRobotDataset(
+ds_wide = HumanCOINDataset(
     repo_id="robot_audio_demo", root=root,
     window_overrides={"observation.audio.mic": (-0.066, 0.0)},
 )

@@ -33,8 +33,8 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 
-from humancoin_lerobot import HumancoinLeRobotDataset
-from humancoin_lerobot.utils import DEFAULT_DATA_PATH
+from humancoin import HumanCOINDataset
+from humancoin.utils import DEFAULT_DATA_PATH
 
 FPS = 30
 DURATION = 2.0                    # seconds recorded after t = 0
@@ -206,7 +206,7 @@ features = {
     },
 }
 
-ds = HumancoinLeRobotDataset.create(
+ds = HumanCOINDataset.create(
     repo_id="async_startup_demo", fps=FPS, features=features,
     root=root, use_videos=False,
 )
@@ -270,7 +270,7 @@ for key in keep:
 
 # ── 4. Read back ────────────────────────────────────────────────────────────
 
-ds2 = HumancoinLeRobotDataset(repo_id="async_startup_demo", root=root)
+ds2 = HumanCOINDataset(repo_id="async_startup_demo", root=root)
 
 item0 = ds2[0]
 print("\n=== Read back ===")

@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from humancoin_lerobot.download import _error_detail, download_dataset, main, resolve_repo_id
+from humancoin.download import _error_detail, download_dataset, main, resolve_repo_id
 
 
 class DownloadTests(unittest.TestCase):
@@ -63,13 +63,13 @@ class DownloadTests(unittest.TestCase):
     def test_cli_import_does_not_load_core_dependencies(self):
         import subprocess
         result = subprocess.run([sys.executable, '-c',
-            "import sys; import humancoin_lerobot.download; "
+            "import sys; import humancoin.download; "
             "assert not any(n in sys.modules for n in ('torch', 'lerobot', 'numpy', 'pyarrow'))"],
             capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_dry_run_has_no_side_effects(self):
-        with tempfile.TemporaryDirectory() as root, patch('humancoin_lerobot.download.download_dataset') as download, contextlib.redirect_stdout(io.StringIO()) as output:
+        with tempfile.TemporaryDirectory() as root, patch('humancoin.download.download_dataset') as download, contextlib.redirect_stdout(io.StringIO()) as output:
             target = Path(root) / 'absent'
             self.assertEqual(main(['--datasets', 'session', 'HumanCOIN/session', '--target-dir', str(target), '--dry-run']), 0)
             download.assert_not_called()
@@ -77,7 +77,7 @@ class DownloadTests(unittest.TestCase):
             self.assertEqual(output.getvalue().count('HumanCOIN/session ->'), 1)
 
     def test_batch_continues_after_failure(self):
-        with patch('humancoin_lerobot.download.download_dataset', side_effect=[RuntimeError('secret'), Path('/tmp/ok')]) as download, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as errors:
+        with patch('humancoin.download.download_dataset', side_effect=[RuntimeError('secret'), Path('/tmp/ok')]) as download, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as errors:
             self.assertEqual(main(['--datasets', 'bad', 'ok']), 1)
             self.assertEqual(download.call_count, 2)
             self.assertNotIn('secret', errors.getvalue())

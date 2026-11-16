@@ -7,15 +7,15 @@ import av
 import numpy as np
 import torch
 
-from humancoin_lerobot import HumancoinLeRobotDataset
-from humancoin_lerobot.video import VideoFeature
+from humancoin import HumanCOINDataset
+from humancoin.video import VideoFeature
 
 
 class DatasetTests(unittest.TestCase):
     def test_multirate_numeric_and_variable_audio_roundtrip(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / 'recording'
-            ds = HumancoinLeRobotDataset.create(
+            ds = HumanCOINDataset.create(
                 repo_id='test', root=root, fps=10,
                 features={
                     'observation.imu': {'dtype':'float32','shape':(2,), 'names':['x','y'],
@@ -31,7 +31,7 @@ class DatasetTests(unittest.TestCase):
             for timestamp, count in [(0,5),(0.05,6),(0.11,7)]:
                 ds.add_frame('observation.audio.mic', np.full(count,0.25,dtype=np.float32), timestamp=timestamp)
             ds.save_episode()
-            loaded = HumancoinLeRobotDataset(repo_id='test', root=root)
+            loaded = HumanCOINDataset(repo_id='test', root=root)
             self.assertEqual(len(loaded),3)
             item = loaded[1]
             self.assertEqual(item['task'],'test activity')

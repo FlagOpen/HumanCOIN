@@ -1,4 +1,4 @@
-# HumanCOIN-LeRobot
+# HumanCOIN
 
 > 📖 English docs: [README.md](README.md)
 
@@ -8,7 +8,7 @@
 
 ## 目录
 
-- [HumanCOIN-LeRobot](#humancoin-lerobot)
+- [HumanCOIN](#humancoin)
   - [目录](#目录)
   - [1. 动机：为什么需要多频率支持](#1-动机为什么需要多频率支持)
   - [2. 安装](#2-安装)
@@ -55,7 +55,7 @@
 
 将不同频率的数据强制合并到统一帧率的表中，通常需要对低频数据上采样、对高频数据降采样或聚合，这可能损失原始采样信息。本项目基于 LeRobot 的数据集基础设施，扩展了按传感器独立存储和按时间查询的能力。
 
-**humancoin_lerobot 的解决方案**：每个传感器独立存储为时间索引的 parquet 文件。读取时通过 `window` 参数定义"如何围绕查询时间戳聚合数据"——无需预先重采样。
+**humancoin 的解决方案**：每个传感器独立存储为时间索引的 parquet 文件。读取时通过 `window` 参数定义"如何围绕查询时间戳聚合数据"——无需预先重采样。
 
 **写入** — `add_frame` 按 key 分流到对应 feature 缓冲，`save_episode()` 时各自落盘：
 
@@ -144,20 +144,18 @@ flowchart TD
 
 Python **3.10–3.13**（已在 Python 3.12 验证），当前固定依赖 **LeRobot 0.3.3**。
 
-从 [PyPI](https://pypi.org/project/humancoin-lerobot/) 安装：
+从 [PyPI](https://pypi.org/project/humancoin/) 安装：
 
 ```bash
-pip install humancoin-lerobot
+pip install humancoin
 ```
 
 也可以从源码安装：
 
 ```bash
-git clone https://github.com/RoboCoin-BAAI/HumanCOIN-LeRobot
-cd HumanCOIN-LeRobot
+git clone https://github.com/RoboCoin-BAAI/HumanCOIN
+cd HumanCOIN
 pip install -e .
-# 可选：桌面/网页可视化
-pip install -e ".[visualization]"
 ```
 
 依赖说明：
@@ -168,15 +166,15 @@ pip install -e ".[visualization]"
 | `pyarrow` | parquet 文件读写 |
 | `numpy` / `torch` | 数据处理 |
 | `av`（PyAV） | 视频编码/解码 |
-| `matplotlib` | 可视化（可选） |
-| `scipy` | 网页可视化信号滤波（可选） |
+| `matplotlib` | 可视化 |
+| `scipy` | 网页可视化信号滤波 |
 
 ### 下载 HumanCOIN 数据集
 
 在 [Hugging Face](https://huggingface.co/HumanCOIN) 或 [ModelScope](https://www.modelscope.cn/organization/HumanCOIN) 浏览数据集。这两个地址是组织页面，下载时需指定所选平台上的具体数据集名称。
 
 ```bash
-pip install humancoin-lerobot
+pip install humancoin
 
 # 将 DATASET_NAME 替换为实际数据集仓库名
 humancoin-download --hub huggingface --datasets DATASET_NAME --target-dir ./data
@@ -187,15 +185,15 @@ humancoin-download --datasets DATASET_NAME --include "meta/*" README.md --target
 
 # 批量指定数据集；仅预览计划，不下载
 humancoin-download --datasets DATASET_A DATASET_B --target-dir ./data --dry-run
-# 也可使用：python -m humancoin_lerobot.download ...
+# 也可使用：python -m humancoin.download ...
 ```
 
 默认组织为 `HumanCOIN`，也支持显式传入 `owner/name`。`--ds_lists` 是 `--datasets` 的别名。保存路径为 `<target-dir>/HumanCOIN/<数据集名>`，默认目标目录为 `~/.cache/huggingface/lerobot`。重复执行时由平台 SDK 复用已下载文件；可用 `--revision` 指定版本、`--max-workers` 设置下载并发数。私有或受限数据集需要账号具备访问权限，并通过 `HF_TOKEN`、`MODELSCOPE_TOKEN` 或 `--token` 提供凭据；ModelScope 使用轻量 `modelscope-hub` SDK，通过客户端传入凭据或读取其登录缓存，也兼容 `MS_TOKEN`。单个数据集失败后仍继续下载其余数据集，存在失败时命令返回非零退出码。
 
 ```python
-from humancoin_lerobot import HumancoinLeRobotDataset
+from humancoin import HumanCOINDataset
 
-ds = HumancoinLeRobotDataset(
+ds = HumanCOINDataset(
     repo_id="HumanCOIN/DATASET_NAME",
     root="data/HumanCOIN/DATASET_NAME",
 )
@@ -208,9 +206,9 @@ item = ds[0]
 
 ```python
 import numpy as np
-from humancoin_lerobot import HumancoinLeRobotDataset
+from humancoin import HumanCOINDataset
 
-ds = HumancoinLeRobotDataset.create(
+ds = HumanCOINDataset.create(
     repo_id="my_dataset", root="data/", fps=30,
     features={
         # 相机：dtype="video" 自动编码为 MP4
@@ -269,7 +267,7 @@ ds.save_episode()
 **读取** — window feature 返回窗口内全部读数，nearest feature 返回最近邻单值：
 
 ```python
-ds = HumancoinLeRobotDataset(repo_id="my_dataset", root="data/")
+ds = HumanCOINDataset(repo_id="my_dataset", root="data/")
 item = ds[10]
 
 item["observation.imu"]             # tensor([33, 6]) — (-0.033, 0] 内 33 个读数
@@ -324,10 +322,10 @@ python -m examples.01write_simple
 python -m examples.01read_simple
 
 # 交互式可视化
-python -m scripts.visualize --episode 0
+humancoin-visualize data/demo --episode 0
 
 # 网页可视化（浏览器界面，可拖动时间窗口）
-python scripts/visualize_web.py [数据集目录]
+humancoin-visualize-web /path/to/dataset
 
 # 音频：麦克风以 WAV + 时间戳 parquet 存储
 python -m examples.06audio_example
@@ -456,7 +454,7 @@ python -m examples.06audio_example
 
 ### 4.9 可视化操作
 
-**可视化效果**（`python -m scripts.visualize --episode 0`）：
+**可视化效果**（`humancoin-visualize data/demo --episode 0`）：
 
 ![可视化效果截图](examples/visualize.png)
 
@@ -542,7 +540,7 @@ ds.add_frame("observation.images.cam", image)
 "window": (-0.066, 0.0)   # (t-66ms, t], ~66 readings
 
 # 读取时动态覆盖
-ds = HumancoinLeRobotDataset(
+ds = HumanCOINDataset(
     repo_id="my_dataset", root="data/",
     window_overrides={"observation.imu": (-0.100, 0.0)},
 )
@@ -560,7 +558,7 @@ ds = HumancoinLeRobotDataset(
 ### 创建数据集
 
 ```python
-ds = HumancoinLeRobotDataset.create(
+ds = HumanCOINDataset.create(
     repo_id="my_dataset",
     fps=30,
     features={...},          # 见下文 Feature 定义格式
@@ -654,7 +652,7 @@ ds.save_episode()    # 落盘全部 buffer，校验对齐/视频帧数，重置�
 ### 读取
 
 ```python
-ds = HumancoinLeRobotDataset(
+ds = HumanCOINDataset(
     repo_id="my_dataset", root="data/",
     episodes=[0, 2],                                    # 只加载 episode 0, 2
     image_transforms=my_transforms,                      # torchvision transforms
@@ -715,12 +713,12 @@ item = ds[10]
 ```mermaid
 flowchart TB
     subgraph Entry["入口层"]
-        DS["HumancoinLeRobotDataset<br/>dataset.py · 编排器<br/>(继承 LeRobotDataset)"]
+        DS["HumanCOINDataset<br/>dataset.py · 编排器<br/>(继承 LeRobotDataset)"]
     end
 
     subgraph Core["核心层"]
         IX["MasterIndex<br/>index.py"]
-        MD["HumancoinDatasetMetadata<br/>metadata.py"]
+        MD["HumanCOINDatasetMetadata<br/>metadata.py"]
     end
 
     subgraph Features["特征层"]
@@ -771,13 +769,13 @@ flowchart TB
 **文件组织：**
 
 ```
-src/humancoin_lerobot/
+src/humancoin/
 ├── dataset.py      (341行)  编排器 — add_frame / save_episode / __getitem__
 ├── audio.py        (185行)  AudioFeature — 缓冲音频块、写 WAV + 时间戳 parquet
 ├── parquet.py      (168行)  ParquetFeature — 写缓冲、存 parquet、加载、窗口查询
 ├── video.py        (168行)  VideoFeature — 存 PNG、编码 MP4、解码帧
 ├── index.py        (127行)  MasterIndex — 帧索引的读写
-├── metadata.py     (123行)  HumancoinDatasetMetadata — info.json 管理
+├── metadata.py     (123行)  HumanCOINDatasetMetadata — info.json 管理
 ├── checker.py      (162行)  DatasetChecker — 视频帧数 + 音频完整性 + 时间戳对齐校验
 └── utils.py        (236行)  常量 + info.json 创建/校验
 ```
@@ -794,7 +792,7 @@ src/humancoin_lerobot/
 
 ## 8. 与原生 LeRobotDataset 对比
 
-| 特性 | 原生 LeRobotDataset | humancoin_lerobot |
+| 特性 | 原生 LeRobotDataset | humancoin |
 |------|-------------------|------------|
 | 存储 | 1 个合并 parquet | N 个 per-feature parquet |
 | 多频率传感器 | 需要预先重采样 | 原生速率，独立存储 |
@@ -835,4 +833,4 @@ python -m build
 python -m twine check dist/*
 ```
 
-wheel 包含 `humancoin_lerobot` 和 `humancoin-download` 命令；`scripts/` 与 `examples/` 仍需从源码运行。私有或 Gated 数据集需要有效 Token 和平台访问授权，仅持有 Token 不代表已经获准访问。发布到 PyPI 需要另行执行。
+wheel 包含数据读写、下载和两种可视化工具。安装 `humancoin` 后即可运行可视化命令，无需下载源码；`examples/` 中的演示脚本需从源码运行。

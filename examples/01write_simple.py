@@ -3,7 +3,7 @@
 import shutil
 from pathlib import Path
 import numpy as np
-from humancoin_lerobot import HumancoinLeRobotDataset
+from humancoin import HumanCOINDataset
 
 FPS = 30
 H, W = 480, 640
@@ -97,7 +97,7 @@ root = Path(__file__).parent.parent / "data" / "demo"
 if root.exists():
     shutil.rmtree(root)
 
-ds = HumancoinLeRobotDataset.create(
+ds = HumanCOINDataset.create(
     repo_id="robot_demo", fps=FPS,
     features={
         "observation.images.head_rgb": {

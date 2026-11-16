@@ -1,4 +1,4 @@
-# HumanCOIN-LeRobot
+# HumanCOIN
 
 > 📖 中文文档：[README_zh-CN.md](README_zh-CN.md)
 
@@ -8,7 +8,7 @@
 
 ## Table of Contents
 
-- [HumanCOIN-LeRobot](#humancoin-lerobot)
+- [HumanCOIN](#humancoin)
   - [Table of Contents](#table-of-contents)
   - [1. Motivation: Why Multi-Frequency Support](#1-motivation-why-multi-frequency-support)
   - [2. Installation](#2-installation)
@@ -55,7 +55,7 @@ Common sensors operate at very different sampling rates:
 
 Forcing streams with different sampling rates into a table at a single frame rate typically requires upsampling low-rate data and downsampling or aggregating high-rate data, which can discard original samples. This project builds on LeRobot’s dataset infrastructure to support independent sensor storage and time-based queries.
 
-**The humancoin_lerobot solution**: every sensor is stored independently as a time-indexed parquet file. At read time, a `window` parameter defines "how to aggregate data around the query timestamp" — no pre-resampling needed.
+**The humancoin solution**: every sensor is stored independently as a time-indexed parquet file. At read time, a `window` parameter defines "how to aggregate data around the query timestamp" — no pre-resampling needed.
 
 **Writing** — `add_frame` routes each key to its feature buffer; `save_episode()` flushes them to disk:
 
@@ -144,20 +144,18 @@ The result of `ds[10]` (t=0.333s):
 
 Python **3.10–3.13** (verified with Python 3.12). LeRobot is currently pinned to **0.3.3**.
 
-Install from [PyPI](https://pypi.org/project/humancoin-lerobot/):
+Install from [PyPI](https://pypi.org/project/humancoin/):
 
 ```bash
-pip install humancoin-lerobot
+pip install humancoin
 ```
 
 Or install from source:
 
 ```bash
-git clone https://github.com/RoboCoin-BAAI/HumanCOIN-LeRobot
-cd HumanCOIN-LeRobot
+git clone https://github.com/RoboCoin-BAAI/HumanCOIN
+cd HumanCOIN
 pip install -e .
-# Optional: desktop and web visualization
-pip install -e ".[visualization]"
 ```
 
 Dependencies:
@@ -168,15 +166,15 @@ Dependencies:
 | `pyarrow` | parquet file I/O |
 | `numpy` / `torch` | data processing |
 | `av` (PyAV) | video encoding/decoding |
-| `matplotlib` | visualization (optional) |
-| `scipy` | web visualizer signal filtering (optional) |
+| `matplotlib` | visualization |
+| `scipy` | web visualizer signal filtering |
 
 ### Download HumanCOIN datasets
 
 Browse dataset names on [Hugging Face](https://huggingface.co/HumanCOIN) or [ModelScope](https://www.modelscope.cn/organization/HumanCOIN). These are organization pages; pass a dataset name from the selected hub to the command below.
 
 ```bash
-pip install humancoin-lerobot
+pip install humancoin
 
 # Replace DATASET_NAME with an actual dataset repository name
 humancoin-download --hub huggingface --datasets DATASET_NAME --target-dir ./data
@@ -187,15 +185,15 @@ humancoin-download --datasets DATASET_NAME --include "meta/*" README.md --target
 
 # Multiple datasets; preview without downloading
 humancoin-download --datasets DATASET_A DATASET_B --target-dir ./data --dry-run
-# Also available as: python -m humancoin_lerobot.download ...
+# Also available as: python -m humancoin.download ...
 ```
 
 The default namespace is `HumanCOIN`; explicit `owner/name` IDs are also accepted. `--ds_lists` is an alias for `--datasets`. Files are stored under `<target-dir>/HumanCOIN/<dataset-name>`; the default target directory is `~/.cache/huggingface/lerobot`. Repeating a download reuses files through the hub SDK. Use `--revision` to select a version and `--max-workers` to control parallel downloads. Private/gated datasets require access and `HF_TOKEN` or `MODELSCOPE_TOKEN` (or `--token`); ModelScope uses the lightweight `modelscope-hub` SDK; credentials are passed to the client or read from its login cache. `MS_TOKEN` is also accepted. A failed dataset does not stop the remaining downloads; the command exits nonzero if any fail.
 
 ```python
-from humancoin_lerobot import HumancoinLeRobotDataset
+from humancoin import HumanCOINDataset
 
-ds = HumancoinLeRobotDataset(
+ds = HumanCOINDataset(
     repo_id="HumanCOIN/DATASET_NAME",
     root="data/HumanCOIN/DATASET_NAME",
 )
@@ -208,9 +206,9 @@ Downloads preserve the repository files; loading requires the multi-frequency da
 
 ```python
 import numpy as np
-from humancoin_lerobot import HumancoinLeRobotDataset
+from humancoin import HumanCOINDataset
 
-ds = HumancoinLeRobotDataset.create(
+ds = HumanCOINDataset.create(
     repo_id="my_dataset", root="data/", fps=30,
     features={
         # camera: dtype="video" auto-encodes to MP4
@@ -269,7 +267,7 @@ ds.save_episode()
 **Reading** — window features return all readings in the window, nearest features return a single vector:
 
 ```python
-ds = HumancoinLeRobotDataset(repo_id="my_dataset", root="data/")
+ds = HumanCOINDataset(repo_id="my_dataset", root="data/")
 item = ds[10]
 
 item["observation.imu"]             # tensor([33, 6]) — 33 readings in (-0.033, 0]
@@ -324,10 +322,10 @@ python -m examples.01write_simple
 python -m examples.01read_simple
 
 # interactive visualizer
-python -m scripts.visualize --episode 0
+humancoin-visualize data/demo --episode 0
 
 # web visualizer (browser UI, draggable time window)
-python scripts/visualize_web.py [DATASET_ROOT]
+humancoin-visualize-web /path/to/dataset
 
 # audio: microphone stored as WAV + timestamp parquet
 python -m examples.06audio_example
@@ -456,7 +454,7 @@ python -m examples.06audio_example
 
 ### 4.9 Visualizer Controls
 
-**Visualizer** (`python -m scripts.visualize --episode 0`):
+**Visualizer** (`humancoin-visualize data/demo --episode 0`):
 
 ![Visualizer screenshot](examples/visualize.png)
 
@@ -543,7 +541,7 @@ The master-clock frame timestamp is the query anchor, but a feature's readings d
 "window": (-0.066, 0.0)   # (t-66ms, t], ~66 readings
 
 # override at read time
-ds = HumancoinLeRobotDataset(
+ds = HumanCOINDataset(
     repo_id="my_dataset", root="data/",
     window_overrides={"observation.imu": (-0.100, 0.0)},
 )
@@ -561,7 +559,7 @@ Note that temperature (10Hz) has no sample at 0.333 — its sampling grid is 0.3
 ### Creating a Dataset
 
 ```python
-ds = HumancoinLeRobotDataset.create(
+ds = HumanCOINDataset.create(
     repo_id="my_dataset",
     fps=30,
     features={...},          # see Feature Definition Format below
@@ -655,7 +653,7 @@ ds.save_episode()    # flush all buffers, run alignment/video checks, reset coun
 ### Reading
 
 ```python
-ds = HumancoinLeRobotDataset(
+ds = HumanCOINDataset(
     repo_id="my_dataset", root="data/",
     episodes=[0, 2],                                    # load only episodes 0, 2
     image_transforms=my_transforms,                      # torchvision transforms
@@ -716,12 +714,12 @@ item = ds[10]
 ```mermaid
 flowchart TB
     subgraph Entry["entry layer"]
-        DS["HumancoinLeRobotDataset<br/>dataset.py · orchestrator<br/>(inherits LeRobotDataset)"]
+        DS["HumanCOINDataset<br/>dataset.py · orchestrator<br/>(inherits LeRobotDataset)"]
     end
 
     subgraph Core["core layer"]
         IX["MasterIndex<br/>index.py"]
-        MD["HumancoinDatasetMetadata<br/>metadata.py"]
+        MD["HumanCOINDatasetMetadata<br/>metadata.py"]
     end
 
     subgraph Features["feature layer"]
@@ -772,13 +770,13 @@ flowchart TB
 **File layout:**
 
 ```
-src/humancoin_lerobot/
+src/humancoin/
 ├── dataset.py      (341 lines)  orchestrator — add_frame / save_episode / __getitem__
 ├── audio.py        (185 lines)  AudioFeature — buffer chunks, write WAV + timestamp parquet
 ├── parquet.py      (168 lines)  ParquetFeature — write buffer, save parquet, load, window query
 ├── video.py        (168 lines)  VideoFeature — save PNG, encode MP4, decode frames
 ├── index.py        (127 lines)  MasterIndex — frame index I/O
-├── metadata.py     (123 lines)  HumancoinDatasetMetadata — info.json management
+├── metadata.py     (123 lines)  HumanCOINDatasetMetadata — info.json management
 ├── checker.py      (162 lines)  DatasetChecker — video frame count + audio integrity + timestamp alignment checks
 └── utils.py        (236 lines)  constants + info.json creation/validation
 ```
@@ -795,7 +793,7 @@ src/humancoin_lerobot/
 
 ## 8. Comparison with Native LeRobotDataset
 
-| Aspect | Native LeRobotDataset | humancoin_lerobot |
+| Aspect | Native LeRobotDataset | humancoin |
 |------|-------------------|------------|
 | Storage | 1 merged parquet | N per-feature parquets |
 | Multi-rate sensors | pre-resampling required | native rates, independent storage |
@@ -836,4 +834,4 @@ python -m build
 python -m twine check dist/*
 ```
 
-The wheel contains the `humancoin_lerobot` package and `humancoin-download` command. The repository's `scripts/` and `examples/` remain source tools. Private/gated downloads require both a valid token and access approval on the chosen platform; a token alone does not grant access. PyPI publishing is a separate step.
+The wheel includes dataset reading/writing, downloads, and both visualizers. Install `humancoin` to use all these features; no source checkout is required. The `examples/` demonstration scripts require a source checkout.

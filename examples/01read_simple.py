@@ -1,9 +1,9 @@
 """Read demo: show alignment strategies + cameras."""
 from pathlib import Path
-from humancoin_lerobot import HumancoinLeRobotDataset
+from humancoin import HumanCOINDataset
 
 root = Path(__file__).parent.parent / "data" / "demo"
-ds = HumancoinLeRobotDataset(repo_id="minimal_demo", root=root, video_backend="pyav")
+ds = HumanCOINDataset(repo_id="minimal_demo", root=root, video_backend="pyav")
 
 print(f"Frames: {ds.num_frames}\n")
 
@@ -22,7 +22,7 @@ temp = item["observation.temperature"]
 print(f"[nearest]            temperature: {temp.item():.1f}°C")
 
 # ── Override window at read time ──
-ds2 = HumancoinLeRobotDataset(
+ds2 = HumanCOINDataset(
     repo_id="minimal_demo", root=root, video_backend="pyav",
     window_overrides={"observation.imu": (-0.066, 0.0)},
 )

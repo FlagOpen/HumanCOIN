@@ -1,11 +1,11 @@
-"""humancoin_lerobot — multi-frequency extension for LeRobot datasets."""
+"""humancoin — multi-frequency extension for LeRobot datasets."""
 
 from .utils import CODEBASE_VERSION
 __version__ = "0.1.1"
 
 __all__ = [
-    "HumancoinLeRobotDataset",
-    "HumancoinDatasetMetadata",
+    "HumanCOINDataset",
+    "HumanCOINDatasetMetadata",
     "AudioFeature",
     "CODEBASE_VERSION",
     "__version__",
@@ -17,8 +17,8 @@ def __getattr__(name):
     from importlib import import_module
 
     modules = {
-        "HumancoinLeRobotDataset": ".dataset",
-        "HumancoinDatasetMetadata": ".metadata",
+        "HumanCOINDataset": ".dataset",
+        "HumanCOINDatasetMetadata": ".metadata",
         "AudioFeature": ".audio",
     }
     if name not in modules:

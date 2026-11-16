@@ -55,7 +55,7 @@ def download_dataset(
         try:
             from huggingface_hub import snapshot_download
         except ImportError as exc:
-            raise RuntimeError('Reinstall download dependencies: pip install --upgrade humancoin-lerobot') from exc
+            raise RuntimeError('Reinstall download dependencies: pip install --upgrade humancoin') from exc
         snapshot_download(
             repo_id=repo_id, repo_type="dataset",
             token=token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN"),
@@ -65,7 +65,7 @@ def download_dataset(
         try:
             from modelscope_hub import HubApi
         except ImportError as exc:
-            raise RuntimeError('Reinstall download dependencies: pip install --upgrade humancoin-lerobot') from exc
+            raise RuntimeError('Reinstall download dependencies: pip install --upgrade humancoin') from exc
         access_token = token or os.environ.get("MODELSCOPE_TOKEN") or os.environ.get("MS_TOKEN") or os.environ.get("MODELSCOPE_API_TOKEN")
         # Pass credentials to this client without changing global login state.
         HubApi(token=access_token).download_repo(repo_id=repo_id, repo_type="dataset", **kwargs)
