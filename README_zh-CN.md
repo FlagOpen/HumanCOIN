@@ -153,7 +153,7 @@ pip install humancoin
 也可以从源码安装：
 
 ```bash
-git clone https://github.com/RoboCoin-BAAI/HumanCOIN
+git clone https://github.com/FlagOpen/HumanCOIN
 cd HumanCOIN
 pip install -e .
 ```

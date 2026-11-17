@@ -25,9 +25,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/RoboCoin-BAAI/HumanCOIN"
-Repository = "https://github.com/RoboCoin-BAAI/HumanCOIN"
-Issues = "https://github.com/RoboCoin-BAAI/HumanCOIN/issues"
+Homepage = "https://github.com/FlagOpen/HumanCOIN"
+Repository = "https://github.com/FlagOpen/HumanCOIN"
+Issues = "https://github.com/FlagOpen/HumanCOIN/issues"
 
 [project.optional-dependencies]
 conversion = ["PyYAML>=6"]
