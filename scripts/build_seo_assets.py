@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
 """Build the social card and the tab icons.
 
-Three assets, all derived from art the release already ships:
+Two inputs, both art the release already ships:
 
-* ``public/og-cover.jpg`` — the 1200x630 card Open Graph and Twitter consumers
-  render. It is a centre crop of the film's title frame (``film-poster.jpg``),
-  chosen instead of a freshly composed card because the frame already carries
-  the wordmark, the subtitle and the release numbers at print quality, so the
-  card cannot drift from the film.
-* ``public/favicon.ico`` / ``public/favicon-32.png`` — the tab mark: the
-  wordmark's initial set in the navy sampled off the poster.
-* ``public/apple-touch-icon.png`` — the same mark at 180 px, unpadded, because
-  iOS applies its own corner mask.
-
-The site's own faces (Jost, Montserrat) ship as woff2 only, which Pillow cannot
-open, so the mark is drawn in DejaVu Sans Bold — at 16-32 px the difference in
-letterform is not visible, and the tile keeps the brand colour.
+* the film's title frame (``public/film/film-poster.jpg``) — cropped to the
+  1200x630 card Open Graph and Twitter consumers render. Chosen over a freshly
+  composed card because the frame already carries the wordmark, the subtitle
+  and the release numbers at print quality, so the card cannot drift from the
+  film.
+* the masthead mascot (``public/logos/humancoin-mark.png``) — the supplied art
+  with its flat #e5e5e5 ground keyed out to alpha. That master is the source of
+  truth; this script only derives the sizes browsers ask for. It is kept
+  transparent, so a tab strip shows the mark directly rather than inside a
+  white box, and a white-ink copy is emitted for dark tab strips where a black
+  mark would disappear.
 
 Run from the repo root: ``python3 scripts/build_seo_assets.py``.
 """
@@ -24,27 +22,25 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-POSTER = ROOT / 'public' / 'film' / 'film-poster.jpg'
 PUBLIC = ROOT / 'public'
-
-# Sampled from the wordmark on the film's title frame.
-NAVY = (19, 33, 44)
-WHITE = (255, 255, 255)
+POSTER = PUBLIC / 'film' / 'film-poster.jpg'
+MARK = PUBLIC / 'logos' / 'humancoin-mark.png'
 
 # 1200x630 is the ratio every social consumer crops to; the poster is 16:9, so
 # the crop takes the full width and trims 36 px off the top and bottom, which
 # keeps the title block centred and leaves one row of takes on either side.
 CARD_SIZE = (1200, 630)
 
+WHITE = (255, 255, 255)
+
 
 def build_card() -> None:
     poster = Image.open(POSTER).convert('RGB')
     w, h = poster.size
-    target_ratio = CARD_SIZE[0] / CARD_SIZE[1]
-    crop_h = round(w / target_ratio)
+    crop_h = round(w / (CARD_SIZE[0] / CARD_SIZE[1]))
     top = (h - crop_h) // 2
     card = poster.crop((0, top, w, top + crop_h)).resize(CARD_SIZE, Image.LANCZOS)
     out = PUBLIC / 'og-cover.jpg'
@@ -52,42 +48,55 @@ def build_card() -> None:
     print(f'{out.relative_to(ROOT)}  {CARD_SIZE[0]}x{CARD_SIZE[1]}  {out.stat().st_size // 1024} KB')
 
 
-def _font(size: int) -> ImageFont.FreeTypeFont:
-    """DejaVu Sans Bold at the requested size, wherever the system keeps it."""
-    for path in (
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-        '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
-        '/Library/Fonts/DejaVuSans-Bold.ttf',
+def _fit(mark: Image.Image, size: int, fill: float) -> Image.Image:
+    """Scale the mark into a `size` square, keeping its aspect and some air."""
+    w, h = mark.size
+    scale = (size * fill) / max(w, h)
+    return mark.resize((max(1, round(w * scale)), max(1, round(h * scale))), Image.LANCZOS)
+
+
+def _tile(size: int, *, fill: float, ground: tuple[int, int, int] | None = None,
+          ink: tuple[int, int, int] | None = None) -> Image.Image:
+    """The mark centred on a square, transparent unless `ground` asks otherwise."""
+    mark = Image.open(MARK).convert('RGBA')
+    glyph = _fit(mark, size, fill)
+    if ink is not None:
+        alpha = glyph.getchannel('A')
+        glyph = Image.merge('RGBA', (Image.new('L', glyph.size, ink[0]),
+                                     Image.new('L', glyph.size, ink[1]),
+                                     Image.new('L', glyph.size, ink[2]), alpha))
+    tile = Image.new('RGBA', (size, size), (*ground, 255) if ground else (0, 0, 0, 0))
+    tile.alpha_composite(glyph, ((size - glyph.width) // 2, (size - glyph.height) // 2))
+    return tile
+
+
+def build_icons() -> None:
+    if not MARK.exists():
+        raise SystemExit(f'missing master art: {MARK}')
+
+    # Favicons sit tight in their box — 16 px is not a place to waste margin.
+    favicon = _tile(256, fill=0.96)
+    ico = PUBLIC / 'favicon.ico'
+    favicon.save(ico, sizes=[(16, 16), (32, 32), (48, 48)])
+    print(f'{ico.relative_to(ROOT)}  16/32/48  {ico.stat().st_size // 1024} KB')
+
+    for size, name, ink in (
+        (32, 'favicon-32.png', None),
+        (32, 'favicon-32-dark.png', WHITE),
     ):
-        if Path(path).exists():
-            return ImageFont.truetype(path, size)
-    raise SystemExit('DejaVu Sans Bold not found; install fonts-dejavu-core')
-
-
-def build_mark() -> None:
-    """Draw the tile at 1024 px, then resample — cheap anti-aliasing."""
-    s = 1024
-    tile = Image.new('RGBA', (s, s), (0, 0, 0, 0))
-    d = ImageDraw.Draw(tile)
-    d.rounded_rectangle((0, 0, s - 1, s - 1), radius=round(s * 0.22), fill=NAVY)
-
-    font = _font(round(s * 0.74))
-    # "C" in DejaVu Bold sits slightly high inside its em box; 'mm' anchors on
-    # the glyph box, so a couple of pixels of optical centring is all it needs.
-    d.text((s / 2, s * 0.505), 'C', font=font, fill=WHITE, anchor='mm')
-
-    for size, name in ((180, 'apple-touch-icon.png'), (32, 'favicon-32.png')):
+        tile = favicon.resize((size, size), Image.LANCZOS) if ink is None else _tile(size, fill=0.96, ink=ink)
         out = PUBLIC / name
-        tile.resize((size, size), Image.LANCZOS).save(out, 'PNG', optimize=True)
+        tile.save(out, 'PNG', optimize=True)
         print(f'{out.relative_to(ROOT)}  {size}x{size}  {out.stat().st_size // 1024} KB')
 
-    ico = PUBLIC / 'favicon.ico'
-    tile.resize((48, 48), Image.LANCZOS).save(
-        ico, sizes=[(16, 16), (32, 32), (48, 48)]
-    )
-    print(f'{ico.relative_to(ROOT)}  16/32/48  {ico.stat().st_size // 1024} KB')
+    # iOS fills alpha with black, which would swallow a black mark, so this one
+    # is the only icon that gets a ground.
+    touch = _tile(180, fill=0.84, ground=WHITE)
+    out = PUBLIC / 'apple-touch-icon.png'
+    touch.convert('RGB').save(out, 'PNG', optimize=True)
+    print(f'{out.relative_to(ROOT)}  180x180  {out.stat().st_size // 1024} KB')
 
 
 if __name__ == '__main__':
     build_card()
-    build_mark()
+    build_icons()
