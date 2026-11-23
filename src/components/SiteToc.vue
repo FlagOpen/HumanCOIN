@@ -7,10 +7,11 @@
  * section index, and the section in view marked by colour alone. It is type,
  * not a panel — no sheet, no rule, nothing boxed.
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { NAV, UI } from '@/content'
 import { useI18n } from '@/composables/useI18n'
 import { useScrollSpy } from '@/composables/useScrollSpy'
+import { useHeroVisible } from '@/composables/useHeroVisible'
 
 const { t } = useI18n()
 
@@ -19,8 +20,9 @@ const { t } = useI18n()
 const ids = NAV.flatMap((n) => [n.id, ...(n.children?.map((c) => c.id) ?? [])])
 const { active } = useScrollSpy(ids)
 
-/* A click sets the highlight straight away: the footer blocks sit too close to
-   the end of the document for the scroll probe to ever reach them. */
+/* A click sets the highlight straight away: the licence block sits too close to
+   the end of the document for any probe to reach it, and a smooth scroll would
+   otherwise let the highlight lag behind the jump. */
 const clicked = ref<string | null>(null)
 let clearClick = 0
 
@@ -30,25 +32,10 @@ const openSection = (item: (typeof NAV)[number]) =>
   current.value === item.id || item.children?.some((c) => c.id === current.value)
 
 /* The cover is a title page, not an article: while it still holds most of the
-   view, the contents has nothing to point at, so it stays out of the way. It
-   hands over as soon as the cover is more than half scrolled past, rather than
-   waiting for the last of it to leave the viewport. */
-const heroVisible = ref(true)
-let io: IntersectionObserver | null = null
-
-onMounted(() => {
-  const hero = document.getElementById('top')
-  if (!hero || typeof IntersectionObserver === 'undefined') return
-  io = new IntersectionObserver(([entry]) => { heroVisible.value = entry.intersectionRatio > 0.5 }, {
-    threshold: [0, 0.5, 1],
-  })
-  io.observe(hero)
-})
-
-onBeforeUnmount(() => {
-  io?.disconnect()
-  io = null
-})
+   view, the contents has nothing to point at, so it stays out of the way. The
+   probe is shared with the notes rail on the right, so both sides of the page
+   arrive at the same moment. */
+const heroVisible = useHeroVisible()
 
 function go(e: MouseEvent, id: string) {
   e.preventDefault()
@@ -65,7 +52,7 @@ function go(e: MouseEvent, id: string) {
   <aside
     class="toc"
     :data-hidden="heroVisible ? 'true' : 'false'"
-    :aria-label="t({ en: 'Contents', zh: '目录' })"
+    :aria-label="t(UI.contents)"
   >
     <p class="toc__label">{{ t(UI.contents) }}</p>
     <nav class="toc__links">

@@ -2,6 +2,7 @@
 import { defineAsyncComponent } from 'vue'
 import SiteNav from '@/components/SiteNav.vue'
 import SiteToc from '@/components/SiteToc.vue'
+import SiteNotes from '@/components/SiteNotes.vue'
 import HeroSection from '@/sections/HeroSection.vue'
 import OverviewSection from '@/sections/OverviewSection.vue'
 import SiteFooter from '@/sections/SiteFooter.vue'
@@ -21,14 +22,15 @@ const DataSection = defineAsyncComponent(() => import('@/sections/DataSection.vu
 const FormatSection = defineAsyncComponent(() => import('@/sections/FormatSection.vue'))
 const PipelineSection = defineAsyncComponent(() => import('@/sections/PipelineSection.vue'))
 const CommunitySection = defineAsyncComponent(() => import('@/sections/CommunitySection.vue'))
+const CiteSection = defineAsyncComponent(() => import('@/sections/CiteSection.vue'))
 const ReleaseSection = defineAsyncComponent(() => import('@/sections/ReleaseSection.vue'))
-const InstallSection = defineAsyncComponent(() => import('@/sections/InstallSection.vue'))
 </script>
 
 <template>
   <a class="skip-link" href="#main">{{ t({ en: 'Skip to content', zh: '跳到正文' }) }}</a>
   <SiteNav />
   <SiteToc />
+  <SiteNotes />
 
   <main id="main">
     <HeroSection />
@@ -40,9 +42,12 @@ const InstallSection = defineAsyncComponent(() => import('@/sections/InstallSect
     <!-- <ResearchSection /> -->
     <FormatSection />
     <PipelineSection />
-    <CommunitySection />
+    <!-- 07: the release figure and, under it, the install band -->
     <ReleaseSection />
-    <InstallSection />
+    <!-- 08: the collaborator wall -->
+    <CommunitySection />
+    <!-- 09: the citation, on its own -->
+    <CiteSection />
   </main>
 
   <SiteFooter />

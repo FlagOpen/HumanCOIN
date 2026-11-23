@@ -49,8 +49,8 @@ type ViewKey = (typeof HEADBAND_KEYS)[number] | (typeof WRIST_KEYS)[number]
 const ALL_VIEW_KEYS: ViewKey[] = [...HEADBAND_KEYS, ...WRIST_KEYS]
 
 /**
- * The views this take actually ships. L2 and L3 record both near-hand cameras;
- * L1 is head-mounted only, and a take that ships no wrist file hides its cell
+ * The views this take actually ships. L3 records both near-hand cameras; L2 and
+ * L1 are head-mounted only, and a take that ships no wrist file hides its cell
  * rather than showing a view the capture never made.
  */
 const viewKeys = computed<ViewKey[]>(() => {

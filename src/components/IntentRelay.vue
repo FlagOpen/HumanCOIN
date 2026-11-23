@@ -45,14 +45,20 @@ const WEAR: Record<TierId, string> = {
   L3: 'wear/person-l3.png',
 }
 
-/** Device number shared by the photograph markers and the reading block. */
+/**
+ * Device number shared by the photograph markers and the reading block.
+ *
+ * Numbered in the order the tiers introduce them — 1 at L1, 2 at L2, 3–7 at L3
+ * — so a column's badges always run upward and the reading block's key matches
+ * the plate.
+ */
 const DEVICE_NO: Record<DeviceId, number> = {
   rgb: 1,
-  wrist: 2,
+  emg: 2,
   eeg: 3,
-  emg: 4,
-  gaze: 5,
-  gloves: 6,
+  gaze: 4,
+  gloves: 5,
+  wrist: 6,
   vive: 7,
 }
 
@@ -65,6 +71,14 @@ const DEVICE_NO: Record<DeviceId, number> = {
  * introduces; carried devices — the headband, wrist cameras and EMG bands
  * already worn at a lower tier — get a small hollow dot instead. Bilateral
  * devices carry one marker per side.
+ *
+ * Each marker sits on the part of the plate that actually shows the device: on
+ * L2 the two black modules on the forearms are the EMG bands, and no wrist
+ * camera is worn there, so L2 carries no WRIST marker. On L3 the WRIST mounts
+ * are the white brackets with the camera barrel at each wrist; the three black
+ * boxes with the light sticker — one on the crown, one on the back of each
+ * hand — are the VIVE trackers, so device 7 is placed on those rather than on
+ * the wrist mounts.
  */
 interface Spot {
   id: DeviceId
@@ -77,22 +91,24 @@ interface Spot {
 const HOTSPOTS: Record<TierId, Spot[]> = {
   L1: [{ id: 'rgb', x: 50, y: 13 }],
   L2: [
-    { id: 'wrist', x: 28.5, y: 83.5 },
-    { id: 'wrist', x: 71.5, y: 83.5 },
-    { id: 'emg', x: 23.5, y: 90 },
-    { id: 'emg', x: 76.5, y: 90 },
+    { id: 'emg', x: 29, y: 82.5 },
+    { id: 'emg', x: 71.5, y: 86.5 },
     { id: 'rgb', x: 50, y: 16, carried: true },
   ],
   L3: [
-    { id: 'eeg', x: 43, y: 8.5 },
+    { id: 'eeg', x: 39.5, y: 9 },
     { id: 'gaze', x: 56.5, y: 23 },
     { id: 'gloves', x: 22, y: 42 },
     { id: 'gloves', x: 78, y: 42 },
-    { id: 'vive', x: 29.6, y: 56.8 },
-    { id: 'vive', x: 68, y: 56.8 },
-    { id: 'rgb', x: 50, y: 19, carried: true },
-    { id: 'wrist', x: 20, y: 65.5, carried: true },
-    { id: 'wrist', x: 78, y: 66.5, carried: true },
+    /* 7 — VIVE trackers: crown and the back of both hands */
+    { id: 'vive', x: 50, y: 11.2 },
+    { id: 'vive', x: 20.3, y: 49.7 },
+    { id: 'vive', x: 77.6, y: 49.5 },
+    /* the headband only, on its camera pod at the left temple */
+    { id: 'rgb', x: 38.4, y: 18.5, carried: true },
+    /* 6 — the wrist cameras, on their mounts beside each forearm */
+    { id: 'wrist', x: 29.6, y: 57.2 },
+    { id: 'wrist', x: 68.2, y: 57.5 },
     { id: 'emg', x: 21.5, y: 58.5, carried: true },
     { id: 'emg', x: 75, y: 58.5, carried: true },
   ],
@@ -118,8 +134,8 @@ const PROTECT: Record<TierId, ProtectShape[]> = {
   L1: [{ x: 50, y: 12.5, rx: 18, ry: 9 }],
   L2: [
     { x: 50, y: 13, rx: 18, ry: 9 },
-    { x: 28.5, y: 83, rx: 9.5, ry: 10 },
-    { x: 71.5, y: 83, rx: 9.5, ry: 10 },
+    { x: 29, y: 82.5, rx: 8, ry: 8.5 },
+    { x: 71.5, y: 86, rx: 8, ry: 8.5 },
   ],
   L3: [
     { x: 50.5, y: 15, rx: 16.5, ry: 12 },
@@ -136,8 +152,7 @@ function carries(tier: Tier, id: DeviceId): boolean {
 }
 
 /** Where a device enters and where the kit carries it last, e.g. `L2 → L3`.
- *  The source tier is read from `TIERS.devices`, not `inherits.from`: the
- *  latter groups wrist under L1 in L3 although L2 introduces it. */
+ *  Read from `TIERS.devices`, which is the tier that introduces an instrument. */
 const ROUTE = new Map<DeviceId, string>(
   DEVICE_META.map((m) => {
     const ids = TIERS.filter((tier) => carries(tier, m.id)).map((tier) => tier.id)
@@ -183,11 +198,9 @@ const SPECS: Record<DeviceId, Spec> = {
       zh: '沿前臂的近手视角，头戴相机看不到的位置。',
     },
     rate: '30 fps · 640×480',
-    status: {
-      en: 'Measured video · hand pose predicted outside controlled L3',
-      zh: '画面实测 · 受控 L3 之外手部位姿由预测',
-    },
-    setting: 'both',
+    status: { en: 'Measured video', zh: '画面实测' },
+    /* Recorded by the L3 rig only, so it never appears in the open settings. */
+    setting: 'controlled',
   },
   eeg: {
     records: {
@@ -234,7 +247,9 @@ const SPECS: Record<DeviceId, Spec> = {
 
 const PROXY: Record<TierId, Bi> = {
   L1: { en: 'Attention', zh: '注意' },
-  L2: { en: 'Effort', zh: '用力' },
+  /* Exertion, not effort: the tier records the load the forearm actually
+     applies, the term the abstract and the report use for L2. */
+  L2: { en: 'Exertion', zh: '用力' },
   L3: { en: 'Cognition', zh: '认知' },
 }
 
@@ -422,8 +437,9 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
 
             <!-- One operator wearing the kit this column records, shown whole
                  (never cropped), centered, with a soft white veil that clears
-                 only around the markers. The cyan numbered dots are the only
-                 callouts; carried devices get a hollow dot instead. -->
+                 only around the markers. The numbered dots — in the tier's own
+                 accent — are the only callouts; carried devices get a hollow
+                 dot instead. -->
             <figure class="ir-wear">
               <img
                 :src="WEAR[col.tier.id]"
@@ -523,6 +539,7 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
                     @blur="clearFocus"
                     @keydown.escape="dismiss"
                   >
+                    <span class="ir-dev__no mono" aria-hidden="true">{{ DEVICE_NO[inst.id] }}</span>
                     <span class="ir-dev__shot">
                       <img
                         v-if="SHOTS[inst.id]"
@@ -562,6 +579,7 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
                     @blur="clearFocus"
                     @keydown.escape="dismiss"
                   >
+                    <span class="ir-dev__no mono" aria-hidden="true">{{ DEVICE_NO[inst.id] }}</span>
                     <span class="ir-dev__shot">
                       <img
                         v-if="SHOTS[inst.id]"
@@ -625,7 +643,7 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
               class="ir-ro__no mono"
               :class="{ 'is-hollow': !r.fresh }"
               aria-hidden="true"
-            >{{ r.fresh ? r.number : '' }}</span>
+            >{{ r.number }}</span>
             <span class="ir-ro__code mono">{{ r.code }}</span>
             <span class="ir-ro__name">{{ r.name }}</span>
             <span class="ir-ro__route mono">{{ r.route }} · {{ r.where }}</span>
@@ -670,6 +688,8 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
 }
 
 .ir-tier {
+  /* the kit grid queries this width, not the viewport's */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -745,7 +765,7 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   pointer-events: none;
 }
 
-/* ---- callout markers: cyan numbered dots, hollow dots for carried devices ---- */
+/* ---- callout markers: tier-coloured numbered dots, hollow dots for carried devices ---- */
 .ir-spot {
   position: absolute;
   z-index: 2;
@@ -756,7 +776,7 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   transform: translate(-50%, -50%);
   border: 1.5px solid #fff;
   border-radius: 50%;
-  background: var(--c-teal);
+  background: var(--accent);
   color: #fff;
   font-family: var(--ff-mono);
   font-size: 9px;
@@ -764,7 +784,7 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   line-height: 1;
   cursor: default;
   box-shadow:
-    0 0 0 1px rgba(15, 111, 104, 0.32),
+    0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent),
     0 1px 3px rgba(20, 32, 43, 0.22);
   transition:
     transform var(--dur-2) var(--ease-spring),
@@ -777,7 +797,10 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   z-index: -1;
   inset: -60%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(57, 178, 170, 0.4), rgba(57, 178, 170, 0) 70%);
+  /* accent halo; blur rather than a gradient so the tier colour comes from the
+     token instead of a hand-picked rgba */
+  background: var(--accent);
+  filter: blur(7px);
   opacity: 0;
   transform: scale(0.7);
   transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
@@ -786,11 +809,11 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   transform: translate(-50%, -50%) scale(1.24);
   box-shadow:
     0 0 0 1.5px #fff,
-    0 0 0 3.5px rgba(15, 111, 104, 0.5),
-    0 0 18px 6px rgba(57, 178, 170, 0.5);
+    0 0 0 3.5px color-mix(in srgb, var(--accent) 50%, transparent),
+    0 0 18px 6px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .ir-spot.is-on::before {
-  opacity: 1;
+  opacity: 0.32;
   transform: scale(1);
   animation: ir-glow 2.4s var(--ease-io) infinite;
 }
@@ -798,7 +821,7 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   width: 8px;
   height: 8px;
   border-width: 1.2px;
-  border-color: var(--c-teal);
+  border-color: var(--accent);
   background: #fff;
   color: transparent;
   box-shadow: 0 0 0 1.2px rgba(255, 255, 255, 0.85);
@@ -806,9 +829,9 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
 .ir-spot--carried.is-on {
   transform: translate(-50%, -50%) scale(1.55);
   box-shadow:
-    0 0 0 1.5px var(--c-teal),
+    0 0 0 1.5px var(--accent),
     0 0 0 4px rgba(255, 255, 255, 0.9),
-    0 0 16px 5px rgba(57, 178, 170, 0.55);
+    0 0 16px 5px color-mix(in srgb, var(--accent) 48%, transparent);
 }
 @keyframes ir-glow {
   0%, 100% { opacity: 0.55; }
@@ -854,17 +877,39 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   padding: 0;
   list-style: none;
 }
+/* Two chips per row, equal tracks, the chips themselves still hug their
+   content. */
 .ir-list--new {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-items: start;
   gap: 0.3rem;
+}
+/* An odd chip count leaves one alone on the last line. Hanging at the left edge
+   it reads as a broken row, so it spans the row and centres itself — a
+   deliberate tail rather than an orphan. A tier with a single instrument is
+   excluded: that chip belongs at the start. */
+.ir-list--new > .ir-item:last-child:nth-child(odd):not(:first-child) {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
+/* Wide enough for three across, five chips read better as 3 + 2 than as 2 + 2
+   plus a tail, so the container's own width decides (the article width moves
+   with the viewport, a media query would guess wrong). */
+@container (min-width: 274px) {
+  .ir-list--new { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ir-list--new > .ir-item:last-child:nth-child(odd):not(:first-child) {
+    grid-column: auto;
+    justify-self: start;
+  }
 }
 .ir-list--carried {
   display: flex;
   flex: 1;
   flex-wrap: wrap;
   align-content: flex-start;
-  gap: 0.12rem 0.4rem;
+  gap: 0.12rem 0.2rem;
 }
 
 .ir-item { min-width: 0; }
@@ -875,7 +920,7 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   align-items: center;
   gap: 0.32rem;
   min-height: 1.9rem;
-  padding: 2px 5px;
+  padding: 2px 3px;
   border: 1px solid transparent;
   border-radius: var(--r-chip);
   transition:
@@ -904,6 +949,26 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   box-shadow: inset 2px 0 0 var(--accent);
 }
 .ir-dev.is-on .ir-dev__code { color: var(--ink); }
+
+.ir-dev__no {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  font-size: 8.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: #fff;
+  letter-spacing: 0;
+}
+.ir-dev--carried .ir-dev__no {
+  background: #fff;
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1.2px var(--accent);
+}
 
 .ir-dev__shot {
   position: relative;
@@ -939,13 +1004,15 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
 }
 .ir-dev--new .ir-dev__code { color: var(--ink); font-weight: 500; }
 
-/* the same instrument, already established, at a lower volume */
+/* the same instrument, already established, at a lower volume — tight enough
+   that a three-instrument tray still sits on one line in the narrow column */
 .ir-dev--carried {
-  gap: 0.28rem;
+  gap: 0.22rem;
   min-height: 1.45rem;
-  padding: 1px 4px;
+  padding: 1px 2px;
 }
-.ir-dev--carried .ir-dev__shot { width: 1.05rem; height: 1.05rem; }
+.ir-dev--carried .ir-dev__no { width: 13px; height: 13px; font-size: 8px; }
+.ir-dev--carried .ir-dev__shot { width: 1rem; height: 1rem; }
 .ir-dev--carried .ir-dev__shot img { filter: grayscale(1); opacity: 0.45; }
 .ir-dev--carried:hover .ir-dev__shot img,
 .ir-dev--carried.is-linked .ir-dev__shot img,
@@ -1110,6 +1177,8 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   align-items: center;
   gap: 0.1rem 0.5rem;
 }
+/* The row's badge: filled for the tier that introduces the instrument, a ring
+   for the tiers that only carry it — the same two states as the plate. */
 .ir-ro__no {
   display: inline-grid;
   place-items: center;
@@ -1118,18 +1187,17 @@ const spotsOf = (tier: TierId) => HOTSPOTS[tier]
   height: 15px;
   border: 1.2px solid #fff;
   border-radius: 50%;
-  background: var(--c-teal);
+  background: var(--accent);
   color: #fff;
   font-size: 9px;
   font-weight: 600;
   line-height: 1;
-  box-shadow: 0 0 0 1px rgba(15, 111, 104, 0.32);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
 }
 .ir-ro__no.is-hollow {
-  width: 8px;
-  height: 8px;
-  border-color: var(--c-teal);
+  border-color: var(--accent);
   background: #fff;
+  color: var(--accent);
   box-shadow: none;
 }
 .ir-ro__code {

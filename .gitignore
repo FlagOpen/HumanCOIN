@@ -38,3 +38,6 @@ scripts/.fig2-gen-state.json
 # Local comparison scratch and Python caches
 .tmp-*/
 __pycache__/
+
+# Local film stills and frame dumps (219 MB of scratch, never shipped)
+video/

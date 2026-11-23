@@ -145,9 +145,9 @@ export interface TierProvenance {
   note: Bi
   streams: Record<'rgb' | 'gaze' | 'pose' | 'glove' | 'emg' | 'eeg', StreamState>
   /**
-   * Whether the tier's rig carries the two near-hand wrist cameras. L3 and the
-   * action tier do; L1 is head-mounted only, so its row shows the headband
-   * views alone rather than a wrist view the tier never records.
+   * Whether the tier's rig carries the two near-hand wrist cameras. L3 does;
+   * L2 and L1 are head-mounted only, so their rows show the headband views
+   * alone rather than a wrist view the tier never records.
    */
   wrist: boolean
 }
@@ -176,10 +176,10 @@ export const TIER_PROVENANCE: TierProvenance[] = [
     name: { en: 'Motor intention', zh: '动作意图' },
     hours: { en: '2,000 h planned', zh: '规划 2,000 小时' },
     note: {
-      en: 'The layer that reads the motor intention. Four synchronised wide views, two wrist views and the two wrist bands’ 16 EMG lanes are recorded; EEG belongs to the tier above. Gaze, head/wrist pose and finger kinematics are predicted from the video (EgoM2P for gaze, HaMeR for hands) and ship with the data — this viewer draws measured streams only.',
-      zh: '读取动作意图的一层。记录四路同步广角视角、两路腕部视角与两条腕带的 16 路肌电；脑电属于上一层。注视、头/腕位姿与手指运动学由视频预测（注视用 EgoM2P，手部用 HaMeR），随数据一并发布——本查看器只绘制实测流。',
+      en: 'The layer that reads the motor intention. Four synchronised wide views and the two wrist bands’ 16 EMG lanes are recorded; the wrist views, EEG and the controlled rig belong to the tier above. Gaze, head/wrist pose and finger kinematics are predicted from the video (EgoM2P for gaze, HaMeR for hands) and ship with the data — this viewer draws measured streams only.',
+      zh: '读取动作意图的一层。记录四路同步广角视角与两条腕带的 16 路肌电；腕部视角、脑电与受控装置属于上一层。注视、头/腕位姿与手指运动学由视频预测（注视用 EgoM2P，手部用 HaMeR），随数据一并发布——本查看器只绘制实测流。',
     },
-    wrist: true,
+    wrist: false,
     streams: {
       rgb: 'measured',
       gaze: 'estimated',

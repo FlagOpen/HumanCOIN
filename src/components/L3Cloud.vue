@@ -512,9 +512,18 @@ function resize() {
   drawGaze()
 }
 
+/**
+ * Every video that runs on the episode clock: the four headband and wrist
+ * views, the depth map and the eye camera. They start, pause and seek together
+ * — a pause that leaves one panel running is not a pause, and the depth map is
+ * a thirty-second clip rather than a still, so it belongs on this clock too.
+ */
+function timelineVideos(): HTMLVideoElement[] {
+  return [...rgbEls.value, depthEl.value, eyeEl.value].filter(Boolean) as HTMLVideoElement[]
+}
+
 function seek(to: number) {
-  const vids = [...rgbEls.value, eyeEl.value].filter(Boolean) as HTMLVideoElement[]
-  vids.forEach((v) => {
+  timelineVideos().forEach((v) => {
     if (Math.abs(v.currentTime - to) > 0.25) v.currentTime = to
   })
 }
@@ -538,8 +547,7 @@ function loop(now: number) {
 }
 
 watch(playing, (on) => {
-  const vids = [...rgbEls.value].filter(Boolean) as HTMLVideoElement[]
-  vids.forEach((v) => {
+  timelineVideos().forEach((v) => {
     v.playbackRate = speed.value
     if (on) void v.play().catch(() => {})
     else v.pause()
@@ -547,7 +555,7 @@ watch(playing, (on) => {
   if (on) seek(t.value)
 })
 watch(speed, (s) => {
-  ;[...rgbEls.value, eyeEl.value].forEach((v) => { if (v) v.playbackRate = s })
+  timelineVideos().forEach((v) => { v.playbackRate = s })
 })
 watch(t, (v) => seek(v))
 watch(
@@ -689,7 +697,7 @@ onMounted(async () => {
   drawGaze()
   window.addEventListener('resize', resize)
   raf = requestAnimationFrame(loop)
-  ;[...rgbEls.value, eyeEl.value].forEach((v) => v && void v.play().catch(() => {}))
+  timelineVideos().forEach((v) => void v.play().catch(() => {}))
 })
 
 onBeforeUnmount(() => {

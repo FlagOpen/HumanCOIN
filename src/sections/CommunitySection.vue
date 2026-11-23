@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /**
- * Collaborating institutions.
+ * Chapter 08 — the collaborating institutions.
  *
  * The mark wall is the whole section: the host institute on its own row, then
  * every collaborator in a fixed five-column grid with its name under the mark.
  * The manifest carries ids only, so the labels live in `NAMES` — the one place
- * that knows what `ant` or `ai2` is called in either language.
+ * that knows what `ant` or `ai2` is called in either language. The citation has
+ * its own chapter after this one.
  */
 import { computed, ref, onMounted } from 'vue'
 import { COMMUNITY } from '@/content'

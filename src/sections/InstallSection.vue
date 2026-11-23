@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /**
- * Closing call to action.
+ * The closing block of chapter 07: how to start.
  *
- * A dark band that borrows the cover's ground — drifting colour fields under a
- * faint ruled grid — so the page opens and closes on the same surface. The only
- * object on it is a terminal: the install line types itself out when the band
- * first enters view, then a second line prints the slogan beneath it.
+ * It is not a section of its own — it sits inside `ReleaseSection`, under one
+ * number, and keeps only a rule and its own heading so it still reads as the
+ * chapter's last action. The only object on it is a terminal: the install line
+ * types itself out when the band first enters view, then a second line prints
+ * the slogan beneath it.
  *
  * The typing is decoration over a string that is already in the DOM's data, not
  * a substitute for it: with reduced motion, or once the animation has run, the
@@ -91,13 +92,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section id="install" ref="el" class="install">
+  <div id="install" ref="el" class="install">
     <div class="shell install__inner">
       <div class="install__copy">
         <p class="install__kicker mono">
           <span class="install__rule" aria-hidden="true"></span>{{ t(INSTALL.kicker) }}
         </p>
-        <h2 class="install__title">{{ t(INSTALL.title) }}</h2>
+        <h3 class="install__title">{{ t(INSTALL.title) }}</h3>
         <p class="install__aside"><RichText :text="t(INSTALL.aside)" /></p>
         <a
           class="install__cta"
@@ -132,7 +133,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
-  </section>
+  </div>
 </template>
 
 <style scoped>
@@ -143,7 +144,6 @@ onBeforeUnmount(() => {
   background: var(--paper);
   color: var(--ink);
   padding-block: clamp(2rem, 1.6rem + 2vw, 3.4rem);
-  border-top: 1px solid var(--line);
 }
 
 .install__inner {
@@ -173,14 +173,16 @@ onBeforeUnmount(() => {
   background: var(--line-strong);
   flex: none;
 }
+/* One step below a section title: the band is chapter 07's closing block, not a
+   chapter head of its own. */
 .install__title {
   font-family: var(--ff-display);
-  font-size: var(--fs-h2);
+  font-size: var(--fs-h3);
   font-weight: 520;
-  letter-spacing: -0.028em;
-  line-height: 1.15;
-  max-width: 22ch;
-  margin-bottom: 1rem;
+  letter-spacing: -0.024em;
+  line-height: 1.18;
+  max-width: 26ch;
+  margin-bottom: 0.85rem;
   color: var(--ink);
 }
 .install__aside {

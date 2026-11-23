@@ -1,97 +1,20 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
-import { FOOTER, CITATION, AUTHORS, SITE, UI } from '@/content'
+/**
+ * The page's closing matter: licence, data statement, contact.
+ *
+ * The citation that used to open this footer now closes chapter 08, under the
+ * wall it credits; what is left here is the legal and contact record, plus the
+ * way back to the top.
+ */
+import { FOOTER, CITATION, SITE, UI } from '@/content'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
 const year = new Date().getFullYear()
 
-/**
- * Built in script so the template never has to escape BibTeX braces.
- *
- * The author list runs to dozens of names, so it is wrapped across lines and
- * hangs under the field indent: one unwrapped line would be far wider than any
- * column and would hide most of the list behind a horizontal scrollbar.
- */
-const FIELD_W = 13
-const authorPrefix = `  ${'author'.padEnd(FIELD_W)} = {`
-const authorHang = ' '.repeat(authorPrefix.length)
-
-function authorLines(names: readonly string[], width = 110): string[] {
-  const lines: string[] = []
-  let cur = ''
-  for (const name of names) {
-    const base = lines.length === 0 ? authorPrefix : authorHang
-    const add = cur ? `, ${name}` : name
-    if (cur && base.length + cur.length + add.length > width) {
-      lines.push(`${base}${cur},`)
-      cur = name
-    } else {
-      cur += add
-    }
-  }
-  lines.push(`${lines.length === 0 ? authorPrefix : authorHang}${cur}},`)
-  return lines
-}
-
-const bibtex = [
-  `@${CITATION.type}{${CITATION.key},`,
-  ...authorLines(AUTHORS),
-  `  ${'title'.padEnd(FIELD_W)} = {${CITATION.title}},`,
-  `  ${'year'.padEnd(FIELD_W)} = {${CITATION.year}},`,
-  `  ${'eprint'.padEnd(FIELD_W)} = {${CITATION.eprint}},`,
-  `  ${'archivePrefix'.padEnd(FIELD_W)} = {arXiv},`,
-  `  ${'primaryClass'.padEnd(FIELD_W)} = {${CITATION.primaryClass}},`,
-  `  ${'url'.padEnd(FIELD_W)} = {${CITATION.url}},`,
-  '}',
-].join('\n')
-
 function toTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
-
-/* Copy the entry as plain text. `navigator.clipboard` needs a secure context,
- * so a selection-based fallback runs where it is missing — a viewer opened over
- * plain http is common enough that a dead button would be the normal case. */
-const copyState = ref<'idle' | 'done' | 'failed'>('idle')
-let resetTimer = 0
-
-function legacyCopy(text: string): boolean {
-  const area = document.createElement('textarea')
-  area.value = text
-  area.setAttribute('readonly', '')
-  area.style.position = 'fixed'
-  area.style.opacity = '0'
-  document.body.appendChild(area)
-  area.select()
-  let ok = false
-  try {
-    ok = document.execCommand('copy')
-  } catch {
-    ok = false
-  }
-  document.body.removeChild(area)
-  return ok
-}
-
-async function copyBibtex() {
-  let ok = false
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(bibtex)
-      ok = true
-    } else {
-      ok = legacyCopy(bibtex)
-    }
-  } catch {
-    ok = legacyCopy(bibtex)
-  }
-  copyState.value = ok ? 'done' : 'failed'
-  clearTimeout(resetTimer)
-  resetTimer = window.setTimeout(() => (copyState.value = 'idle'), 2000)
-}
-
-onBeforeUnmount(() => clearTimeout(resetTimer))
 </script>
 
 <template>
@@ -100,23 +23,6 @@ onBeforeUnmount(() => clearTimeout(resetTimer))
       <div class="foot__brand">
         <p class="foot__mark mono">{{ SITE.name }}</p>
       </div>
-
-      <!-- the citation takes a row of its own: the author list needs the width -->
-      <section id="cite" class="foot__cite">
-        <div class="foot__citehead">
-          <h3 class="foot__h">{{ t(FOOTER.citeTitle) }}</h3>
-          <button
-            class="foot__copy"
-            type="button"
-            :class="`is-${copyState}`"
-            :aria-label="t(UI.copyBibtex)"
-            @click="copyBibtex"
-          >
-            {{ copyState === 'done' ? t(UI.copied) : copyState === 'failed' ? t(UI.copyFailed) : t(UI.copy) }}
-          </button>
-        </div>
-        <pre class="foot__code">{{ bibtex }}</pre>
-      </section>
 
       <div class="foot__cols">
         <section id="license">
@@ -168,31 +74,7 @@ onBeforeUnmount(() => clearTimeout(resetTimer))
 .foot__mark { font-size: var(--fs-h4); font-weight: 660; color: var(--ink); margin: 0 0 0.3rem; letter-spacing: -0.02em; }
 
 /* ---- citation: a single full-width row ---- */
-.foot__cite { min-width: 0; }
-.foot__citehead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-.foot__citehead .foot__h { margin-bottom: 0.6rem; }
-.foot__copy {
-  font: inherit;
-  font-family: var(--ff-mono);
-  font-size: var(--fs-tick);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  background: var(--paper);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-xs);
-  padding: 0.22rem 0.55rem;
-  cursor: pointer;
-  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
-}
-.foot__copy:hover { color: var(--ink); border-color: var(--ink-mute); }
-.foot__copy.is-done { color: var(--c-teal); border-color: var(--c-teal); }
-.foot__copy.is-failed { color: var(--c-amber); border-color: var(--c-amber); }
+
 
 .foot__cols {
   display: grid;
@@ -213,23 +95,6 @@ onBeforeUnmount(() => clearTimeout(resetTimer))
 }
 .foot__p { font-size: var(--fs-micro); line-height: 1.7; color: var(--ink-soft); margin: 0 0 0.5rem; }
 .foot__p--strong { color: var(--ink); font-weight: 600; font-family: var(--ff-mono); }
-.foot__code {
-  margin: 0;
-  padding: 0.8rem 0.9rem;
-  background: var(--paper);
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  font-size: var(--fs-micro);
-  line-height: 1.7;
-  color: var(--ink-body);
-  white-space: pre-wrap;
-  /* Break only when a single token is wider than the line; `anywhere` was
-     splitting ordinary words mid-way and reading as broken text. */
-  overflow-wrap: break-word;
-  word-break: normal;
-}
-
 .foot__base {
   display: flex;
   flex-wrap: wrap;

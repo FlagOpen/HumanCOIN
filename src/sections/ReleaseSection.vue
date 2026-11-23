@@ -1,38 +1,41 @@
 <script setup lang="ts">
 /**
- * The release figure, re-housed.
+ * Chapter 07 — the release, and the start.
  *
- * The cover used to carry it; it now closes the argument just before *Start*.
- * By this point the reader has met the tiers, the scenes and the processing, so
- * the figure reads as the last concrete look at the data — one synchronised
- * moment, every channel its capture actually records — before the page turns to
- * how to obtain it.
+ * Two blocks that used to be two chapters: the release figure, which shows one
+ * synchronised moment per tier, and the install band, which is how a reader
+ * gets the rest. They share one number, one contents entry and one set of
+ * margin notes; the band keeps its own heading underneath, so it still reads as
+ * the closing action rather than as a second section.
  */
 import SectionHead from '@/components/SectionHead.vue'
 import CoverFigure from '@/components/CoverFigure.vue'
+import InstallSection from '@/sections/InstallSection.vue'
+import { RELEASE } from '@/content'
 </script>
 
 <template>
   <section id="release" class="section">
-    <div class="shell">
+    <div class="shell release__head">
       <SectionHead
-        :kicker="{ en: 'The release', zh: '发布内容' }"
-        :title="{ en: 'One moment, in every channel.', zh: '同一个瞬间，所有通道。' }"
-        :aside="{
-          en: 'A take from each tier, drawn on the clock its capture shares. Hover a card to open its moment; the channel a take does not ship is drawn as a labelled gap, never filled in.',
-          zh: '每个层级各取一段录制，按它们共享的时钟展开。指向任意卡片即可打开那一瞬；该层级未采集的通道会标为空白，而不是补画。',
-        }"
-        single
+        :num="RELEASE.num"
+        :kicker="RELEASE.kicker"
+        :title="RELEASE.title"
+        :aside="RELEASE.aside"
       />
 
       <CoverFigure />
     </div>
+
+    <!-- The chapter's closing block: the client that opens the release. -->
+    <InstallSection />
   </section>
 </template>
 
 <style scoped>
-.shell {
-  /* The figure is the section: no extra bottom padding beyond the section's. */
+.release__head {
+  /* The band below draws its own top rule, so the figure does not need to pay
+     for one at the bottom of the shell. */
   padding-bottom: 0.25rem;
 }
 </style>

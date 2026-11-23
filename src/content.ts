@@ -54,12 +54,218 @@ export const NAV: NavItem[] = [
     label: { en: 'Data processing', zh: '数据处理' },
     children: [{ id: 'pipeline-framework', label: { en: 'Five chains', zh: '五条链路' } }],
   },
-  { id: 'community', num: '07', label: { en: 'Collaboration', zh: '合作机构' } },
-  { id: 'release', label: { en: 'The release', zh: '发布内容' } },
-  { id: 'install', label: { en: 'Start', zh: '开始使用' } },
-  { id: 'cite', label: { en: 'Cite', zh: '引用' } },
+  { id: 'release', num: '07', label: { en: 'Release and start', zh: '发布与开始' } },
+  { id: 'community', num: '08', label: { en: 'Community', zh: '生态' } },
+  { id: 'cite', num: '09', label: { en: 'Cite', zh: '引用' } },
   { id: 'license', label: { en: 'License', zh: '许可' } },
 ]
+
+/**
+ * Margin notes: a short gloss for two or three terms the section's own copy
+ * uses, printed in the rail to the right of the article.
+ *
+ * This is not a glossary of the dataset — every entry explains a word the
+ * reader has just met in that section, in one sentence, and then stops. Keys
+ * are `NAV` section ids, so a note can never point at a section that is not on
+ * the page; a section with no notes simply leaves the rail empty.
+ */
+export interface Note {
+  term: Bi
+  gloss: Bi
+}
+
+export const NOTES: Record<string, Note[]> = {
+  abstract: [
+    {
+      term: { en: 'Proxy', zh: '代理量' },
+      gloss: {
+        en: 'A measurable stand-in for a quantity the corpus cannot record directly: gaze for attention, surface EMG for the load a hand applies.',
+        zh: '无法直接记录的量的可测替代：用注视代表注意，用表面肌电代表手实际施加的负荷。',
+      },
+    },
+    {
+      term: { en: 'Intent pathway', zh: '意图通路' },
+      gloss: {
+        en: 'The chain from decision to effect, with a trace left at each link: the eyes arrive first, then muscle load, then cortex.',
+        zh: '从决策到执行的链条，每一环都留下痕迹：先到的是眼睛，其次是肌肉负荷，最后是皮层。',
+      },
+    },
+    {
+      term: { en: 'Egocentric', zh: '第一人称' },
+      gloss: {
+        en: 'Filmed from the operator’s own head, so a frame is what the hands see, not what a bystander sees.',
+        zh: '从操作者头部拍摄：画面是手所见的视角，而不是旁观者的视角。',
+      },
+    },
+  ],
+  overview: [
+    {
+      term: { en: 'Observation–action pair', zh: '观测—动作对' },
+      gloss: {
+        en: 'The unit current datasets store: what the camera saw, and what the hand did next.',
+        zh: '现有数据集存储的单元：相机看到了什么，手接着做了什么。',
+      },
+    },
+    {
+      term: { en: 'Latent z', zh: '潜在变量 z' },
+      gloss: {
+        en: 'The state between observing and acting. The section argues it has to stay explicit instead of being averaged into a policy.',
+        zh: '介于观测与行动之间的状态。本节主张它必须显式保留，而不是被平均进策略。',
+      },
+    },
+  ],
+  data: [
+    {
+      term: { en: 'Signal depth', zh: '信号深度' },
+      gloss: {
+        en: 'How much of the body a recorded hour carries: gaze at L1, EMG at L2, EEG and measured pose at L3.',
+        zh: '一小时的录制承载了多少身体信号：L1 注视、L2 肌电、L3 脑电与实测位姿。',
+      },
+    },
+    {
+      term: { en: 'Scene vocabulary', zh: '场景词表' },
+      gloss: {
+        en: 'The 38 scene classes, drawn in zone order and stacked by the tier that records each class.',
+        zh: '38 个场景类别，按区域顺序排列，并按记录它的层级堆叠。',
+      },
+    },
+    {
+      term: { en: 'Rank–frequency', zh: '秩–频曲线' },
+      gloss: {
+        en: 'Types sorted by how often they occur, one line per tier, so the long tail and the head are read in the same frame.',
+        zh: '按出现频次排序的类型曲线，每层一条，让长尾与头部在同一张图里被读出。',
+      },
+    },
+  ],
+  annotation: [
+    {
+      term: { en: 'Episode', zh: '片段' },
+      gloss: {
+        en: 'One recorded take with its own clock, calibration and annotation; the unit every query is keyed to.',
+        zh: '一段录制，带自己的时钟、标定与标注，也是所有查询的索引单位。',
+      },
+    },
+    {
+      term: { en: 'Native rate', zh: '原生采样率' },
+      gloss: {
+        en: 'Each band keeps the rate of its own sensor — 200 Hz gaze, 2,000 Hz EMG — rather than being resampled to a common grid.',
+        zh: '每条条带保留自身传感器的采样率（注视 200 Hz、肌电 2,000 Hz），不重采样到统一栅格。',
+      },
+    },
+  ],
+  acquisition: [
+    {
+      term: { en: 'Tier kit', zh: '层级装备' },
+      gloss: {
+        en: 'Everything one operator wears at a tier. Each kit carries the one below it, so the inventory steps 1 → 2 → 7.',
+        zh: '某一层操作者所穿戴的全部仪器。每套都带上下一层的全部设备，件数依次为 1 → 2 → 7。',
+      },
+    },
+    {
+      term: { en: 'Controlled L3', zh: '受控 L3' },
+      gloss: {
+        en: 'The subset recorded in a fixed rig, where gaze and hand pose are measured rather than inferred from video.',
+        zh: '在固定装置中录制的子集：注视与手部位姿在此是实测，而不是从画面推断。',
+      },
+    },
+    {
+      term: { en: 'Exertion', zh: '施力' },
+      gloss: {
+        en: 'The load a forearm actually applies, read from surface EMG. The L2 signal, and distinct from the effort a task looks like it needs.',
+        zh: '前臂实际施加的负荷，由表面肌电读出；这是 L2 的信号，与“任务看起来需要多大力”不同。',
+      },
+    },
+  ],
+  format: [
+    {
+      term: { en: 'Master index', zh: '主索引' },
+      gloss: {
+        en: 'One row per frame holding the keys that line features up; the features themselves stay in their own parquet files.',
+        zh: '每帧一行，保存把各特征对齐的键；特征本身仍留在各自的 parquet 文件里。',
+      },
+    },
+    {
+      term: { en: 'Query-time alignment', zh: '查询时对齐' },
+      gloss: {
+        en: 'Nearest sample, interpolation or a window, chosen per feature when you ask — never baked into storage.',
+        zh: '最近邻、插值或时间窗，在查询时按特征选择，而不是写进存储。',
+      },
+    },
+  ],
+  pipeline: [
+    {
+      term: { en: 'Provenance', zh: '溯源' },
+      gloss: {
+        en: 'The record of what each stream passed through. A stream that fails the quality gate is quarantined, not averaged into the rest.',
+        zh: '每路信号经过哪些处理的记录。未通过质量门控的流会被隔离，而不会被平均进其余数据。',
+      },
+    },
+    {
+      term: { en: 'Spatiotemporal reference', zh: '时空参考' },
+      gloss: {
+        en: 'One explicit clock and one coordinate frame across every stream — the contract the figure gathers everything into.',
+        zh: '所有信号共用的一份显式时钟与一个坐标系，也就是图中汇聚一切的那份契约。',
+      },
+    },
+  ],
+  /* Chapter 07 covers the figure and the install band under it, so its notes
+     gloss both: what a take is, what a gap is, and what the install adds. */
+  release: [
+    {
+      term: { en: 'Take', zh: '录制' },
+      gloss: {
+        en: 'One recorded moment from a tier, drawn on the clock its capture shares with the other tiers.',
+        zh: '某层的一段录制，按与其他层级共享的时钟展开。',
+      },
+    },
+    {
+      term: { en: 'Labelled gap', zh: '标注空白' },
+      gloss: {
+        en: 'A channel this take does not ship: drawn as an empty slot with its name, never filled in with a guess.',
+        zh: '这一段没有采集的通道：画成带名称的空位，而不是用推测补上。',
+      },
+    },
+    {
+      term: { en: 'Reader and downloader', zh: '读取器与下载器' },
+      gloss: {
+        en: 'What the install adds: read episodes in place, fetch only the ones you need, preview before downloading.',
+        zh: '安装带来的东西：就地读取片段、只取所需的那几段、下载前先预览。',
+      },
+    },
+  ],
+  community: [
+    {
+      term: { en: 'Collaborating institutions', zh: '合作机构' },
+      gloss: {
+        en: 'The labs and companies behind the corpus, listed by mark; the host institute takes a row of its own.',
+        zh: '参与建设语料的高校与企业，按标识列出；主办机构单独占一行。',
+      },
+    },
+    {
+      term: { en: 'Open stack', zh: '开放栈' },
+      gloss: {
+        en: 'Acquisition software, a browser and downloader for released episodes, and a client library — all shipped with the data.',
+        zh: '采集软件、已发布片段的浏览器与下载器，以及客户端库，全部随数据发布。',
+      },
+    },
+  ],
+  cite: [
+    {
+      term: { en: 'Preprint', zh: '预印本' },
+      gloss: {
+        en: 'The entry is an arXiv preprint in cs.CV; the BibTeX block is the citable record.',
+        zh: '条目为 cs.CV 的 arXiv 预印本；BibTeX 块就是可引用的记录。',
+      },
+    },
+    {
+      term: { en: 'CC BY-NC 4.0', zh: 'CC BY-NC 4.0' },
+      gloss: {
+        en: 'Data and documentation: attribution required, non-commercial research and teaching only. Code is Apache-2.0.',
+        zh: '数据与文档：必须署名，仅限非商业的研究与教学使用；代码采用 Apache-2.0。',
+      },
+    },
+  ],
+}
 
 export const HERO = {
   eyebrow: { en: 'Egocentric · Embodied · Human signals', zh: '第一人称 · 具身 · 人体信号' },
@@ -111,17 +317,19 @@ export const AUTHORS = [
 ] as const
 
 /**
- * The citation record. The work is now an arXiv preprint (cs.CV) rather than an
- * institutional technical report, so the entry follows the arXiv convention:
- * `@misc` with `eprint` / `archivePrefix` / `primaryClass`.
+ * The citation record.
+ *
+ * The entry is the `@article` form readers actually paste: the arXiv id lives
+ * in the journal field and the author list is written out in full, surname
+ * first, rather than standing behind `and others`.
  */
 export const CITATION = {
   key: 'wu2026humancoin',
-  type: 'misc',
+  type: 'article',
   title: 'HumanCOIN: A 12,500-Hour Dataset for Human Intent in Egocentric Manipulation',
   year: '2026',
   eprint: '2611.26434',
-  primaryClass: 'cs.CV',
+  /** The footer's "read the report" link. */
   url: 'https://arxiv.org/abs/2611.26434',
 } as const
 
@@ -230,8 +438,8 @@ export const ACQUISITION = {
   kicker: { en: 'Intent proxies', zh: '意图代理量' },
   title: { en: 'Three stations on the intent pathway.', zh: '意图通路上的三个站点。' },
   aside: {
-    en: 'Each tier is the tier below plus its instruments: L1 carries the headband cameras from which **gaze is estimated**; L2 adds forearm surface EMG and the wrist views; L3 adds EEG and the controlled-setting eye tracker and motion capture that **measure gaze and hand pose directly**. The kits step **1 → 3 → 7**, so measurement depth and scene coverage read together rather than trade off.',
-    zh: '每一层都是下一层加上自己的仪器：L1 带头环相机，**注视由其画面估计**；L2 加入前臂表面肌电与双腕视角；L3 加入脑电，以及受控设置里的眼动仪与动作捕捉，**直接实测注视与手部位姿**。三套装备依次为 **1 → 3 → 7** 件，测量深度与场景覆盖因此可以一起读，而不是互相取舍。',
+    en: 'Each tier is the tier below plus its instruments: L1 carries the headband cameras from which **gaze is estimated**; L2 adds forearm surface EMG; L3 adds EEG, the wrist views, and the controlled-setting eye tracker and motion capture that **measure gaze and hand pose directly**. The kits step **1 → 2 → 7**, so measurement depth and scene coverage read together rather than trade off.',
+    zh: '每一层都是下一层加上自己的仪器：L1 带头环相机，**注视由其画面估计**；L2 加入前臂表面肌电；L3 加入脑电、双腕视角，以及受控设置里的眼动仪与动作捕捉，**直接实测注视与手部位姿**。三套装备依次为 **1 → 2 → 7** 件，测量深度与场景覆盖因此可以一起读，而不是互相取舍。',
   },
   tierAxis: { en: 'Measurement density', zh: '测量密度' },
   scaleAxis: { en: 'Scene coverage and volume', zh: '场景覆盖与规模' },
@@ -291,13 +499,12 @@ export const TIERS: Tier[] = [
     hoursLabel: { en: 'hours planned', zh: '规划小时' },
     accent: 'teal',
     summary: {
-      en: 'How the motor intention is carried out: surface EMG at the muscle — the last link of the motor command — plus near-hand wrist views, over semi-structured tasks that leave the desk.',
-      zh: '动作意图如何被执行：肌肉处的表面肌电——运动指令的最后一环——以及近手腕视角，覆盖离开桌面的半结构化任务。',
+      en: 'How the motor intention is carried out: surface EMG at the muscle — the last link of the motor command — over semi-structured tasks that leave the desk.',
+      zh: '动作意图如何被执行：肌肉处的表面肌电——运动指令的最后一环——覆盖离开桌面的半结构化任务。',
     },
-    seats: { en: '8 stations · portable EMG kits plus a shared pool of headbands and wrist cameras', zh: '8 席位 · 便携肌电套件与共享头环、腕相机池' },
+    seats: { en: '8 stations · portable EMG kits plus a shared pool of headbands', zh: '8 席位 · 便携肌电套件与共享头环池' },
     devices: [
       { id: 'emg', name: { en: 'Bilateral surface EMG', zh: '双侧表面肌电' }, detail: { en: '2 sensors per kit, 8 kits', zh: '2 只/套，8 套' } },
-      { id: 'wrist', name: { en: 'Wrist cameras', zh: '双腕相机' }, detail: { en: '2 per station · shared pool', zh: '2 只/席位 · 共享设备池' } },
     ],
     inherits: [{ from: 'L1', ids: ['rgb'] }],
   },
@@ -308,18 +515,21 @@ export const TIERS: Tier[] = [
     hoursLabel: { en: 'hours planned', zh: '规划小时' },
     accent: 'violet',
     summary: {
-      en: 'The cognitive intention behind the act: gaze measured rather than inferred, and EEG at the cortex, on controlled tabletop manipulation where calibration quality matters most.',
-      zh: '动作背后的认知意图：注视由估计变为实测，脑电直达皮层，用于受控桌面操作任务，对标定质量要求最高。',
+      en: 'The cognitive intention behind the act: gaze measured rather than inferred, EEG at the cortex, and near-hand wrist views, on controlled tabletop manipulation where calibration quality matters most.',
+      zh: '动作背后的认知意图：注视由估计变为实测，脑电直达皮层，并加入近手腕视角，用于受控桌面操作任务，对标定质量要求最高。',
     },
     seats: { en: '11 stations · 3 research-grade, 8 portable EEG · tabletop tasks', zh: '11 席位 · 3 研究级、8 便携 EEG · 桌面任务' },
     devices: [
       { id: 'eeg', name: { en: '128 / 32 / 8-channel EEG', zh: '128 / 32 / 8 通道 EEG' }, detail: { en: 'Research-grade amplifier at 3 stations · portable 8-channel caps at 8 stations', zh: '研究级放大器 3 席位 · 便携 8 通道 8 席位' } },
       { id: 'gaze', name: { en: 'Wearable eye tracker', zh: '可穿戴眼动仪' }, detail: { en: 'Binocular gaze, 3 units', zh: '双目注视，3 套' } },
       { id: 'gloves', name: { en: 'Haptic motion-capture gloves', zh: '触觉动捕手套' }, detail: { en: 'MANUS Metaglove Pro · 20 joint angles per hand at capture, released as a 25-node skeleton per hand · 3 pairs', zh: 'MANUS Metaglove Pro · 采集每手 20 个关节角，发布为每手 25 节点骨架 · 3 副' } },
+      /* The near-hand views belong to the controlled rig, not to L2: the L2
+         plate carries no wrist camera. Order here sets the badge numbers. */
+      { id: 'wrist', name: { en: 'Wrist cameras', zh: '双腕相机' }, detail: { en: '2 per station · near-hand view along each forearm', zh: '2 只/席位 · 沿前臂的近手视角' } },
       { id: 'vive', name: { en: 'VIVE Tracker 3.0', zh: 'VIVE Tracker 3.0' }, detail: { en: 'Head and both wrists, 3 per kit', zh: '头部与双腕，3 只/套' } },
     ],
     inherits: [
-      { from: 'L1', ids: ['rgb', 'wrist'] },
+      { from: 'L1', ids: ['rgb'] },
       { from: 'L2', ids: ['emg'] },
     ],
   },
@@ -1018,14 +1228,47 @@ export const ACCESS = {
   emptyState: { en: 'No episodes match these filters.', zh: '没有符合条件的片段。' },
 } as const
 
-export const COMMUNITY = {
+/**
+ * Chapter 07 joins the two closing blocks of the argument: the release figure,
+ * which shows what a reader gets, and the install band, which is how they start.
+ * The figure keeps the title; the band keeps its own heading below.
+ */
+export const RELEASE = {
   num: '07',
+  kicker: { en: 'The release and the start', zh: '发布与开始' },
+  title: { en: 'One moment, in every channel.', zh: '同一个瞬间，所有通道。' },
+  aside: {
+    en: 'A take from each tier, drawn on the clock its capture shares — the channel a take does not ship is drawn as a labelled gap, never filled in. Under the figure, the client that opens the rest.',
+    zh: '每个层级各取一段录制，按它们共享的时钟展开；该层级未采集的通道会标为空白，而不是补画。图的下方，是打开其余数据的客户端。',
+  },
+} as const
+
+export const COMMUNITY = {
+  num: '08',
   kicker: { en: 'Community', zh: '生态' },
   title: { en: 'Collaborating institutions', zh: '合作机构' },
   aside: {
-    en: 'The wall lists the institutions behind the corpus; the release is open too. **Acquisition software**, a browser and downloader for released episodes, and a **client library** ship with the data: code under Apache-2.0, documentation and data under the **CC BY-NC 4.0 research licence**. Browse, download, or take the acquisition stack to a new scene.',
-    zh: '这面墙列出的是参与建设语料的机构；这份发布数据的生态同样开放。**采集软件**、已发布片段的浏览器与下载器，以及可直接使用的**客户端库**随数据一同发布：代码采用 Apache-2.0，文档与数据采用 **CC BY-NC 4.0 研究许可**。可以先浏览、再下载，也可以把采集栈带到新的场景。',
+    en: 'The wall lists the institutions behind the corpus, and the release is open too: **acquisition software**, a browser and downloader for released episodes, and a **client library** ship with the data. Browse, download, or take the acquisition stack to a new scene.',
+    zh: '这面墙列出参与建设语料的机构，这份发布数据的生态同样开放：**采集软件**、已发布片段的浏览器与下载器，以及可直接使用的**客户端库**随数据一同发布。可以先浏览、再下载，也可以把采集栈带到新的场景。',
   },
+} as const
+
+/**
+ * Chapter 09 — the citation, on its own.
+ *
+ * It used to close the community chapter; the wall and the entry are separate
+ * things, so they now get separate numbers and separate contents lines.
+ */
+export const CITE = {
+  num: '09',
+  kicker: { en: 'Citation', zh: '引用' },
+  title: { en: 'One entry for 12,500 hours.', zh: '一条记录，12,500 小时。' },
+  aside: {
+    en: 'The entry below is the citable record: an arXiv preprint in cs.CV, set from the release’s own author order. Cite it as it stands — code is **Apache-2.0**, documentation and data are **CC BY-NC 4.0**, non-commercial research and teaching with attribution.',
+    zh: '下方是引用本文的条目：cs.CV 的 arXiv 预印本，作者顺序沿用发布时的顺序。照原样引用即可——代码采用 **Apache-2.0**，文档与数据采用 **CC BY-NC 4.0**，允许署名后的非商业研究与教学使用。',
+  },
+  /** Small mono label over the BibTeX block. */
+  label: { en: 'BibTeX', zh: 'BibTeX' },
 } as const
 
 export const INSTALL = {
@@ -1075,6 +1318,8 @@ export const FOOTER = {
 
 export const UI = {
   contents: { en: 'Contents', zh: '目录' },
+  notes: { en: 'Notes', zh: '注释' },
+  notesAria: { en: 'Notes on the terms in this section', zh: '本节术语注释' },
   languageToggle: { en: '中文', zh: 'EN' },
   languageToggleAria: { en: 'Switch to Chinese', zh: '切换到英文' },
   menu: { en: 'Menu', zh: '菜单' },
