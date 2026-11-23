@@ -211,9 +211,16 @@ export const FRAME_MS_AXIS = Array.from(
   (_, i) => (i * 1000) / FPS,
 )
 
-/** Grid offset of the reading nearest the query, for nearest-mode lanes. */
+/**
+ * Grid offset of the reading nearest the query, for nearest-mode lanes.
+ *
+ * The search runs to the end of the drawn axis, not to the query instant: a
+ * feature on its own clock (the head camera's exposure clock runs 11 ms late)
+ * can have its closest reading *after* the frame, and cutting the list at
+ * SPAN_MS would hand back the earlier one instead.
+ */
 export function nearestMs(lane: MfLane): number {
-  const all = laneSamples(lane)
+  const all = laneSamples(lane, AXIS_END_MS)
   let best = all[0]
   for (const ms of all) {
     if (Math.abs(ms - SPAN_MS) < Math.abs(best - SPAN_MS)) best = ms

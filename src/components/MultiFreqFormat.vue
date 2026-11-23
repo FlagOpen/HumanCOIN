@@ -240,16 +240,6 @@ void inView
           <text class="mf__frame mono" :x="f.x" :y="RAIL_Y - 13" text-anchor="middle">{{ f.label }}</text>
         </g>
 
-        <!-- the window the query reads from -->
-        <rect
-          class="mf__band"
-          :class="{ 'is-on': queryOn }"
-          :x="windowFromX"
-          :y="LANE_Y0 - 9"
-          :width="queryX - windowFromX"
-          :height="LANE_Y0 + LANE_GAP * (lanes.length - 1) - LANE_Y0 + 18"
-        />
-
         <g
           v-for="l in lanes"
           :key="l.lane.id"
@@ -306,10 +296,12 @@ void inView
           </g>
         </g>
 
-        <!-- the query instant, drawn through every lane -->
+        <!-- the query instant, drawn through every lane. The readout sits in
+             the band under the rail, to the right of its own line: on the frame
+             labels' row it ran into the n−1 tick. -->
         <g class="mf__query" :class="{ 'is-on': queryOn }">
           <line :x1="queryX" :x2="queryX" :y1="RAIL_Y" :y2="LANE_Y0 + LANE_GAP * (lanes.length - 1) + 12" />
-          <text :x="queryX - 5" :y="RAIL_Y - 13" text-anchor="end">{{ t(FORMAT.queryLabel) }}</text>
+          <text :x="queryX + 6" :y="RAIL_Y + 15" text-anchor="start">{{ t(FORMAT.queryLabel) }}</text>
         </g>
 
         <!-- independent clocks: one bracket over the four lanes -->
@@ -433,9 +425,6 @@ void inView
 .mf__tick.is-past { stroke: var(--c-slate); stroke-dasharray: none; opacity: 0.45; }
 .mf__tick-dot { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 1; transition: fill var(--dur) var(--ease); }
 .mf__tick-dot.is-past { fill: var(--c-slate); stroke: var(--c-slate); }
-.mf__band { fill: var(--c-amber); opacity: 0; transition: opacity 320ms var(--ease); }
-.mf__band.is-on { opacity: 0.1; }
-
 .mf__name { font-size: 8.8px; fill: #2b323a; font-weight: 400; font-family: var(--ff-sans); letter-spacing: 0; }
 .mf__hz { font-size: 7.6px; fill: #6d747c; }
 .mf__mode-tag { font-size: 7px; letter-spacing: 0.04em; fill: #8b929a; letter-spacing: 0.02em; }
@@ -470,7 +459,6 @@ void inView
 .mf__query.is-on { opacity: 1; }
 .mf__query line { stroke: var(--ink); stroke-width: 1.3; stroke-dasharray: 4 4; }
 .mf__query text { font-family: var(--ff-mono); font-size: 7.6px; fill: var(--ink); }
-.mf__band-label { font-size: 7.6px; fill: var(--ink-soft); }
 
 
 
@@ -541,7 +529,7 @@ void inView
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mf__band, .mf__query, .mf__dot, .mf__tick, .mf__tick-dot,
+  .mf__query, .mf__dot, .mf__tick, .mf__tick-dot,
   .mf__file rect:first-of-type, .mf__out, .mf__tbl tbody tr { transition: none; }
 }
 </style>

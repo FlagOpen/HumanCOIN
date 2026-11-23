@@ -214,11 +214,11 @@ const cols = computed(() =>
     g,
     x: X0 + i * PITCH,
     i,
-    headLines: wrap(t(g.title), 13, COL_W - 58),
-    subLines: wrap(t(g.sub), 10.5, COL_W - 58),
+    headLines: wrap(t(g.title), 16, COL_W - 58),
+    subLines: wrap(t(g.sub), 13, COL_W - 58),
     steps: g.steps.map((s, k) => ({
       ...s,
-      lines: wrap(t(s.label), 11.5, COL_W - 56),
+      lines: wrap(t(s.label), 14, COL_W - 56),
       y: STEP_Y + k * (STEP_H + STEP_GAP),
     })),
   })),
@@ -395,10 +395,10 @@ const running = computed(() => playing.value && !reduced.value)
             <path :d="ICONS[c.g.icon]" />
           </g>
           <text class="pf__head" :x="c.x + 44" :y="HEAD_Y + 34">
-            <tspan v-for="(line, li) in c.headLines" :key="li" :x="c.x + 44" :dy="li === 0 ? 0 : 16">{{ line }}</tspan>
+            <tspan v-for="(line, li) in c.headLines" :key="li" :x="c.x + 44" :dy="li === 0 ? 0 : 19">{{ line }}</tspan>
           </text>
-          <text class="pf__sub" :x="c.x + 44" :y="HEAD_Y + 34 + c.headLines.length * 16 + 6">
-            <tspan v-for="(line, li) in c.subLines" :key="li" :x="c.x + 44" :dy="li === 0 ? 0 : 14">{{ line }}</tspan>
+          <text class="pf__sub" :x="c.x + 44" :y="HEAD_Y + 34 + c.headLines.length * 19 + 6">
+            <tspan v-for="(line, li) in c.subLines" :key="li" :x="c.x + 44" :dy="li === 0 ? 0 : 16">{{ line }}</tspan>
           </text>
 
           <!-- the steps, in the order they run -->
@@ -416,7 +416,7 @@ const running = computed(() => playing.value && !reduced.value)
             <rect class="pf__chip" :x="c.x + 16" :y="s.y" :width="COL_W - 32" :height="STEP_H" rx="8" />
             <circle class="pf__dot" :cx="c.x + 30" :cy="s.y + STEP_H / 2 - (s.lines.length > 1 ? 6 : 0)" r="2.4" />
             <text class="pf__chip-t" :x="c.x + 36" :y="s.y + STEP_H / 2 + (s.lines.length > 1 ? -5 : 4)">
-              <tspan v-for="(line, li) in s.lines" :key="li" :x="c.x + 36" :dy="li === 0 ? 0 : 15">{{ line }}</tspan>
+              <tspan v-for="(line, li) in s.lines" :key="li" :x="c.x + 36" :dy="li === 0 ? 0 : 18">{{ line }}</tspan>
             </text>
             <path
               v-if="k < c.steps.length - 1"
@@ -495,12 +495,12 @@ const running = computed(() => playing.value && !reduced.value)
 .pf__svg text {
   font-family: var(--ff-sans);
 }
-.pf__input { font-size: 10.5px; fill: var(--ink-mute); }
-.pf__head { font-size: 13px; font-weight: 500; fill: var(--ink); letter-spacing: 0; }
-.pf__sub { font-size: 10.5px; fill: var(--ink-mute); }
-.pf__chip-t { font-size: 11.5px; fill: var(--ink-soft); font-weight: 400; }
-.pf__note { font-size: 9.5px; fill: var(--ink-mute); letter-spacing: 0.04em; }
-.pf__ep { font-size: 11.5px; font-weight: 500; fill: var(--ink); }
+.pf__input { font-size: 13px; fill: var(--ink-mute); }
+.pf__head { font-size: 16px; font-weight: 500; fill: var(--ink); letter-spacing: 0; }
+.pf__sub { font-size: 13px; fill: var(--ink-mute); }
+.pf__chip-t { font-size: 14px; fill: var(--ink-soft); font-weight: 400; }
+.pf__note { font-size: 12px; fill: var(--ink-mute); letter-spacing: 0.04em; }
+.pf__ep { font-size: 14px; font-weight: 500; fill: var(--ink); }
 
 .pf__card { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
 .pf__step { cursor: default; outline: none; }

@@ -18,6 +18,11 @@ html[data-theme='dark'] .nav__logo {
   filter: invert(1) brightness(1.7);
   opacity: 0.92;
 }
+/* the project wordmark is black on transparent, so it only needs inverting */
+html[data-theme='dark'] .nav__wordmark {
+  filter: invert(1);
+  opacity: 0.94;
+}
 
 /* ---- hero cover: deep blue-black ground; the wordmark goes light ---- */
 html[data-theme='dark'] .cover {

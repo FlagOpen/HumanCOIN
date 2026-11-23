@@ -58,6 +58,8 @@ onBeforeUnmount(() => {
 })
 
 const BAAI_MARK = 'logos/baai-acrylic.png'
+/** The project's own wordmark, set beside the institute's mark. */
+const WORDMARK = 'logos/humancoin-wordmark.png'
 
 /**
  * The three destinations: the dataset manager, the paper on arXiv, and the code
@@ -76,8 +78,10 @@ const ACTIONS = [
 <template>
   <header class="nav">
     <div class="nav__inner">
-      <a class="nav__brand" href="#top" aria-label="BAAI">
+      <a class="nav__brand" href="#top">
         <img class="nav__logo" :src="BAAI_MARK" alt="BAAI" />
+        <span class="nav__rule" aria-hidden="true" />
+        <img class="nav__wordmark" :src="WORDMARK" alt="HumanCOIN" />
       </a>
 
       <nav class="nav__actions" :aria-label="t({ en: 'Dataset resources', zh: '数据集资源' })">
@@ -190,7 +194,19 @@ const ACTIONS = [
   margin-left: max(1.25rem, calc(50% - var(--article-w) / 2 - var(--toc-w) - var(--toc-gap)));
 }
 
-.nav__brand { display: flex; align-items: center; flex: none; }
+.nav__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.72rem;
+  flex: none;
+}
+/* the two marks share one baseline: a hairline, not a box, between them */
+.nav__rule {
+  width: 1px;
+  height: 20px;
+  background: var(--line-strong);
+  flex: none;
+}
 
 .nav__links {
   display: flex;
@@ -224,6 +240,17 @@ const ACTIONS = [
 }
 .nav__brand:hover { text-decoration: none; }
 .nav__logo { height: 22px; width: auto; display: block; }
+/* The artwork is 6.5:1 and cropped flush to its baseline and to the antenna's
+   tip, so a centred box puts the letters lower than the institute mark's caps.
+   The box is lifted by the gap between the two baselines instead — a hair over
+   a sixth of its height, tuned at each size below. */
+.nav__wordmark {
+  height: 29px;
+  width: auto;
+  display: block;
+  position: relative;
+  top: -3px;
+}
 
 .nav__actions {
   display: flex;
@@ -344,9 +371,19 @@ const ACTIONS = [
   transition: transform 90ms linear;
 }
 
+@media (max-width: 640px) {
+  .nav__brand { gap: 0.65rem; }
+  .nav__rule { display: none; }
+  .nav__logo { height: 18px; }
+  .nav__wordmark { height: 22px; top: -1px; }
+}
 @media (max-width: 560px) {
   .nav__act { font-size: var(--fs-micro); }
   .nav__lang { display: none; }
+}
+@media (max-width: 400px) {
+  .nav__logo { height: 16px; }
+  .nav__wordmark { height: 19px; top: -1px; }
 }
 /* Below this the three links would push the bar past the viewport, so they
    collapse to their glyphs; the label survives as the link's accessible name. */
