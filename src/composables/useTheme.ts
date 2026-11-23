@@ -6,7 +6,9 @@ import { computed, ref } from 'vue'
  * The initial value is applied by the inline script in `index.html` before the
  * app paints, so there is no flash. This module owns the live state: it mirrors
  * the system media query, persists a manual choice, and writes the resolved
- * theme to `<html data-theme>` (the CSS tokens key off that attribute).
+ * theme to `<html data-theme>` (the CSS tokens key off that attribute). A
+ * reader who never chooses stays on `system`; the masthead's one button flips
+ * to the other appearance and pins it.
  */
 export type ThemeMode = 'system' | 'light' | 'dark'
 
@@ -41,11 +43,9 @@ function setMode(next: ThemeMode) {
   apply()
 }
 
-/** system → dark → light → system */
-function cycle() {
-  const order: ThemeMode[] = ['system', 'dark', 'light']
-  const i = order.indexOf(mode.value)
-  setMode(order[(i + 1) % order.length])
+/** Flip to the other appearance, so one press is enough. */
+function toggle() {
+  setMode(resolved.value === 'dark' ? 'light' : 'dark')
 }
 
 function initTheme() {
@@ -73,7 +73,7 @@ function initTheme() {
 
 export function useTheme() {
   initTheme()
-  return { mode, systemDark, resolved, setMode, cycle }
+  return { mode, systemDark, resolved, setMode, toggle }
 }
 
 export { initTheme }
