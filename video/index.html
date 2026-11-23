@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HumanCOIN — a film on human intent</title>
+  <meta name="description" content="A 3-minute film about HumanCOIN, a 12,500-hour dataset for human intent in egocentric manipulation.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2314202b'/%3E%3Ctext x='16' y='23' font-family='Montserrat,sans-serif' font-size='16' fill='%23fff' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="film.css">
+</head>
+<body>
+  <div id="frame">
+    <div id="stage">
+      <div id="chrome">
+        <div class="top">
+          <img src="assets/logos/baai.png" alt="BAAI">
+          <span>HumanCOIN · human intent in egocentric manipulation</span>
+        </div>
+        <div class="bottom">
+          <span id="chap">01 &nbsp; THE GAP</span>
+          <span>12,500 h &nbsp;·&nbsp; 38 scenes &nbsp;·&nbsp; 3 tiers</span>
+        </div>
+      </div>
+      <div id="progress"><i></i></div>
+      <div id="captions"></div>
+    </div>
+  </div>
+
+  <div id="poster">
+    <div class="inner">
+      <button class="btn" id="startbtn" aria-label="Play the film">▶</button>
+      <div class="txt">
+        <div class="t">HumanCOIN — a film</div>
+        <div class="s">3 min 42 s · English narration · sound on</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="hint">Space to play · C for captions · F for fullscreen</div>
+
+  <div id="ui">
+    <button class="playbtn" id="play" aria-label="Play or pause">▶</button>
+    <div id="scrub" aria-label="Seek">
+      <div class="rail"></div>
+      <div class="buf"></div>
+      <div class="fill" id="fill"></div>
+      <div class="marks" id="marks"></div>
+    </div>
+    <div class="time" id="time">0:00 / 3:41</div>
+    <button id="cc" style="opacity:.45" aria-label="Captions">CC</button>
+    <button id="fs" aria-label="Fullscreen">⛶</button>
+  </div>
+
+  <script src="assets/thumbs.js"></script>
+  <script src="assets/mosaic.js"></script>
+  <script src="film-data.js"></script>
+  <script src="assets/l3/data.js"></script>
+  <script src="film.js"></script>
+</body>
+</html>

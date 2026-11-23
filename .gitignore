@@ -1,7 +1,7 @@
-# 忽略生成的文件
-dist/
-build/
-config/
+# 忽略生成的文件（仅仓库根目录；video/build 等子目录里的脚本要入库）
+/dist/
+/build/
+/config/
 # 忽略 Node.js 运行时文件
 node_modules/
 # 忽略 IDE 和编辑器生成的文件
@@ -38,6 +38,3 @@ scripts/.fig2-gen-state.json
 # Local comparison scratch and Python caches
 .tmp-*/
 __pycache__/
-
-# Local film stills and frame dumps (219 MB of scratch, never shipped)
-video/

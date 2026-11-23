@@ -1,0 +1,283 @@
+1
+00:00:00,917 --> 00:00:03,560
+HumanCOIN. A dataset of human intent.
+
+2
+00:00:03,990 --> 00:00:05,904
+Every demonstration records what happened;
+
+3
+00:00:06,347 --> 00:00:07,935
+almost none record why.
+
+4
+00:00:08,990 --> 00:00:11,581
+A demonstration is usually stored as a pair:
+
+5
+00:00:11,972 --> 00:00:14,407
+an observation, and the action that followed.
+
+6
+00:00:14,837 --> 00:00:17,219
+A policy learns to map one to the other.
+
+7
+00:00:17,662 --> 00:00:19,954
+But the same observation can precede a lift,
+
+8
+00:00:20,201 --> 00:00:23,391
+a re-grip, a pause, an abandoned attempt.
+
+9
+00:00:23,834 --> 00:00:25,266
+The frame does not say which.
+
+10
+00:00:25,696 --> 00:00:27,441
+Something is missing in between:
+
+11
+00:00:27,844 --> 00:00:30,994
+the operator's intent, the state that decides how the
+
+12
+00:00:30,956 --> 00:00:33,196
+action unfolds. It is latent.
+
+13
+00:00:33,626 --> 00:00:35,188
+No camera sees it directly.
+
+14
+00:00:36,241 --> 00:00:38,416
+Take something ordinary: picking up a cup.
+
+15
+00:00:38,845 --> 00:00:41,710
+It takes a decision, a glance, and a movement.
+
+16
+00:00:42,140 --> 00:00:44,601
+Not three separate systems, one pathway.
+
+17
+00:00:45,030 --> 00:00:49,326
+Cognition, vision, motor control, running from the decision to
+
+18
+00:00:49,275 --> 00:00:52,270
+its effect. We call it the human intent pathway.
+
+19
+00:00:53,290 --> 00:00:56,168
+The pathway is a complex system, but it leaves
+
+20
+00:00:56,181 --> 00:01:00,256
+traces as it flows. Cortex prepares the movement hundreds
+
+21
+00:01:00,269 --> 00:01:03,797
+of milliseconds before the hand moves, and EEG can
+
+22
+00:01:03,759 --> 00:01:07,808
+see it. Muscle loads before contact, and surface EMG
+
+23
+00:01:07,821 --> 00:01:11,036
+carries the load. Gaze reaches the object before the
+
+24
+00:01:10,920 --> 00:01:13,380
+fingers do, and eye tracking records it.
+
+25
+00:01:13,811 --> 00:01:15,842
+Three stations. Three signals.
+
+26
+00:01:16,272 --> 00:01:16,923
+One intent.
+
+27
+00:01:17,982 --> 00:01:20,612
+This is the measurement HumanCOIN was built for.
+
+28
+00:01:21,042 --> 00:01:24,792
+Twelve thousand five hundred hours, thirty-eight scene classes,
+
+29
+00:01:25,013 --> 00:01:28,243
+and three tiers of intent proxies, on one task
+
+30
+00:01:28,256 --> 00:01:30,079
+ontology and one clock.
+
+31
+00:01:31,108 --> 00:01:35,000
+At the output end, L1: ten thousand hours of
+
+32
+00:01:34,884 --> 00:01:38,763
+multi-view egocentric video, where gaze is inferred from the
+
+33
+00:01:38,621 --> 00:01:40,600
+head camera before the hand departs.
+
+34
+00:01:41,043 --> 00:01:46,121
+Midway, L2: two thousand hours, adding bilateral surface EMG,
+
+35
+00:01:46,460 --> 00:01:49,102
+so load is readable before the object leaves the
+
+36
+00:01:48,986 --> 00:01:51,564
+table. At the origin, L3:
+
+37
+00:01:51,955 --> 00:01:56,211
+five hundred hours, adding scalp EEG, for preparation and
+
+38
+00:01:56,160 --> 00:01:59,987
+error monitoring. Each tier inherits every proxy below it.
+
+39
+00:02:00,353 --> 00:02:03,048
+Depth is an axis, not a separate dataset.
+
+40
+00:02:04,106 --> 00:02:05,669
+One episode, on one clock.
+
+41
+00:02:06,137 --> 00:02:08,169
+Four head views and two wrist views.
+
+42
+00:02:08,598 --> 00:02:10,864
+Depth and point cloud from the stereo pair.
+
+43
+00:02:11,307 --> 00:02:13,872
+Six-degree-of-freedom head and wrist pose;
+
+44
+00:02:14,158 --> 00:02:15,734
+twenty joint angles per hand.
+
+45
+00:02:16,163 --> 00:02:19,445
+Gaze, EMG and EEG at their native rates.
+
+46
+00:02:19,874 --> 00:02:23,273
+In the controlled L3 setting these quantities are measured,
+
+47
+00:02:23,663 --> 00:02:26,761
+not inferred, a reference the shallower tiers can be
+
+48
+00:02:26,658 --> 00:02:27,479
+scored against.
+
+49
+00:02:28,549 --> 00:02:30,242
+The corpus is not one kind of room.
+
+50
+00:02:30,763 --> 00:02:33,432
+Thirty-eight scene classes across five zones:
+
+51
+00:02:33,745 --> 00:02:37,143
+residential, commercial, professional, industrial,
+
+52
+00:02:37,416 --> 00:02:40,958
+public, plus residual. Ninety-nine task verbs.
+
+53
+00:02:41,401 --> 00:02:43,784
+Six hundred and thirty-five object classes.
+
+54
+00:02:44,213 --> 00:02:46,245
+A long tail, deliberately kept.
+
+55
+00:02:46,674 --> 00:02:49,422
+The deeper the tier, the more controlled the staging:
+
+56
+00:02:49,851 --> 00:02:52,885
+L3 is roughly seventy percent bench-controlled.
+
+57
+00:02:53,939 --> 00:02:55,997
+Storage is asynchronous by design.
+
+58
+00:02:56,426 --> 00:02:59,447
+Each stream keeps its own clock, its own native
+
+59
+00:02:59,460 --> 00:03:02,922
+rate, and its own parquet table, twenty-three of them,
+
+60
+00:03:03,223 --> 00:03:06,659
+never resampled. A master index at thirty frames per
+
+61
+00:03:06,635 --> 00:03:09,603
+second resolves every modality at query time:
+
+62
+00:03:10,111 --> 00:03:12,937
+nearest sample, interpolation, or a window.
+
+63
+00:03:13,379 --> 00:03:14,994
+The data declares its alignment;
+
+64
+00:03:15,319 --> 00:03:16,361
+it does not bake it in.
+
+65
+00:03:17,409 --> 00:03:20,858
+HumanCOIN is led by B A A I, with
+
+66
+00:03:20,834 --> 00:03:24,323
+twenty-seven institutions across universities and industry,
+
+67
+00:03:24,610 --> 00:03:26,328
+and recordings from six sites.
+
+68
+00:03:27,341 --> 00:03:29,932
+The data, the browser and the client are open.
+
+69
+00:03:30,362 --> 00:03:33,357
+One command to install. One episode to begin.
+
+70
+00:03:33,800 --> 00:03:36,755
+Project page, report, and release are below.
+
+71
+00:03:37,185 --> 00:03:38,344
+Welcome to HumanCOIN.

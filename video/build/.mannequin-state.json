@@ -1,0 +1,38 @@
+{
+  "think": {
+    "prompt": "Photo edit of an egocentric-manipulation dataset demonstration: replace the person in the photograph with a life-size white articulated mannequin (artist's mannequin: matte ivory-white finish, smooth jointed limbs, featureless smooth head with no face, no hair, no clothing, no seams of skin). Keep the room, the table, the mug, the lighting and the camera framing exactly as in the source photo. Muted cool palette, soft daylight, shallow depth of field, realistic and understated. No text, no lettering, no logos, no watermark, no UI overlay. The mannequin's pose must match the person's pose. Phase: The mannequin stands at the table looking down at the mug, hands resting lightly on the table edge, still, as if deciding.",
+    "model": "gpt-image-2.5-flare",
+    "size": [
+      1280,
+      853
+    ],
+    "seconds": 19.0
+  },
+  "reach": {
+    "prompt": "Photo edit of an egocentric-manipulation dataset demonstration: replace the person in the photograph with a life-size white articulated mannequin (artist's mannequin: matte ivory-white finish, smooth jointed limbs, featureless smooth head with no face, no hair, no clothing, no seams of skin). Keep the room, the table, the mug, the lighting and the camera framing exactly as in the source photo. Muted cool palette, soft daylight, shallow depth of field, realistic and understated. No text, no lettering, no logos, no watermark, no UI overlay. The mannequin's pose must match the person's pose. Phase: The mannequin leans slightly toward the table, one arm extended toward the mug, fingers open and approaching the mug but not yet touching it.",
+    "model": "gpt-image-2.5-flare",
+    "size": [
+      1280,
+      853
+    ],
+    "seconds": 16.5
+  },
+  "grasp": {
+    "prompt": "Photo edit of an egocentric-manipulation dataset demonstration: replace the person in the photograph with a life-size white articulated mannequin (artist's mannequin: matte ivory-white finish, smooth jointed limbs, featureless smooth head with no face, no hair, no clothing, no seams of skin). Keep the room, the table, the mug, the lighting and the camera framing exactly as in the source photo. Muted cool palette, soft daylight, shallow depth of field, realistic and understated. No text, no lettering, no logos, no watermark, no UI overlay. The mannequin's pose must match the person's pose. Phase: The mannequin's articulated hand closes around the mug on the table, fingers wrapped, just lifting its weight.",
+    "model": "gpt-image-2.5-flare",
+    "size": [
+      1280,
+      853
+    ],
+    "seconds": 15.9
+  },
+  "hold": {
+    "prompt": "Photo edit of an egocentric-manipulation dataset demonstration: replace the person in the photograph with a life-size white articulated mannequin (artist's mannequin: matte ivory-white finish, smooth jointed limbs, featureless smooth head with no face, no hair, no clothing, no seams of skin). Keep the room, the table, the mug, the lighting and the camera framing exactly as in the source photo. Muted cool palette, soft daylight, shallow depth of field, realistic and understated. No text, no lettering, no logos, no watermark, no UI overlay. The mannequin's pose must match the person's pose. Phase: The mannequin lifts the mug off the table, holding it in front of its chest, arm raised, mug clearly in hand.",
+    "model": "gpt-image-2.5-flare",
+    "size": [
+      1280,
+      853
+    ],
+    "seconds": 19.6
+  }
+}

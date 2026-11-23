@@ -1,0 +1,67 @@
+1
+00:00:00,565 --> 00:00:04,442
+HumanCOIN. Twelve thousand five hundred hours of human intent.
+
+2
+00:00:05,244 --> 00:00:07,361
+A policy maps observation to action.
+
+3
+00:00:07,795 --> 00:00:10,974
+But one frame precedes a lift, a pause, an
+
+4
+00:00:10,831 --> 00:00:13,101
+abandoned attempt. Intent is missing.
+
+5
+00:00:13,856 --> 00:00:16,394
+In a person, intent is a pathway:
+
+6
+00:00:16,777 --> 00:00:18,945
+cognition, gaze, movement.
+
+7
+00:00:19,684 --> 00:00:22,579
+It leaves traces. EEG before movement.
+
+8
+00:00:23,000 --> 00:00:25,909
+EMG before contact. Gaze before the hand.
+
+9
+00:00:26,677 --> 00:00:28,654
+So we recorded three depths:
+
+10
+00:00:28,934 --> 00:00:32,544
+ten thousand hours of attention, two thousand of exertion,
+
+11
+00:00:32,850 --> 00:00:36,256
+five hundred of cognition, each inheriting the one below.
+
+12
+00:00:37,004 --> 00:00:41,226
+One clock. Six views. Depth, point cloud, twenty joint
+
+13
+00:00:41,239 --> 00:00:42,132
+angles per hand.
+
+14
+00:00:42,949 --> 00:00:47,643
+Thirty-eight scenes, ninety-nine verbs, six hundred and thirty-five objects.
+
+15
+00:00:48,356 --> 00:00:51,736
+Twenty-three asynchronous tables, aligned at query time.
+
+16
+00:00:52,460 --> 00:00:55,496
+Led by BAAI, with twenty-seven institutions.
+
+17
+00:00:56,228 --> 00:00:59,047
+One command to install. Welcome to HumanCOIN.
