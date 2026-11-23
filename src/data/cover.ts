@@ -45,9 +45,10 @@ export const COVER = {
   /**
    * The cover's actions.
    *
-   * The three destinations the release actually publishes: the data manager
-   * that serves the episodes, the paper, and the code. The primary one is the
-   * dataset itself; the report and the code accompany it.
+   * The four destinations the release actually publishes: the data manager
+   * that serves the episodes, the paper, the documentation site, and the code
+   * on GitHub. The primary one is the dataset itself; the other three
+   * accompany it.
    */
   actions: [
     {
@@ -63,8 +64,14 @@ export const COVER = {
       primary: false,
     },
     {
-      id: 'code',
-      label: { en: 'Code', zh: '代码' },
+      id: 'docs',
+      label: { en: 'Docs', zh: '文档' },
+      href: 'https://flagopen.github.io/HumanCOIN-Doc/',
+      primary: false,
+    },
+    {
+      id: 'github',
+      label: { en: 'GitHub', zh: 'GitHub' },
       href: 'https://github.com/FlagOpen/HumanCOIN',
       primary: false,
     },

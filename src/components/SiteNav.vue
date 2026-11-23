@@ -3,7 +3,7 @@
  * The masthead.
  *
  * One horizontal bar carries everything: the institute's wordmark at the left,
- * the section index in the middle, the three destinations a reader came for at
+ * the section index in the middle, the four destinations a reader came for at
  * the right. Set as type rather than as a panel — no chips, no boxes; the
  * section in view is marked with colour. A hairline along the bottom edge fills
  * as the document is read.
@@ -62,16 +62,19 @@ const BAAI_MARK = 'logos/baai-acrylic.png'
 const WORDMARK = 'logos/humancoin-wordmark.png'
 
 /**
- * The three destinations: the dataset manager, the paper on arXiv, and the code
- * on GitHub. All three leave the page, so they open in a new tab.
+ * The destinations a reader came for: the dataset manager, the paper on arXiv,
+ * the documentation, and the code on GitHub. All four leave the page, so they
+ * open in a new tab.
  */
 const ACTIONS = [
   { id: 'download', href: 'https://flagopen.github.io/HumanCOIN-DataManager', external: true, primary: true,
     label: { en: 'Download', zh: '下载' } },
   { id: 'report', href: 'https://arxiv.org/abs/2611.26434', external: true, primary: false,
     label: { en: 'Report', zh: '报告' } },
-  { id: 'code', href: 'https://github.com/FlagOpen/HumanCOIN', external: true, primary: false,
-    label: { en: 'Code', zh: '代码' } },
+  { id: 'docs', href: 'https://flagopen.github.io/HumanCOIN-Doc/', external: true, primary: false,
+    label: { en: 'Docs', zh: '文档' } },
+  { id: 'github', href: 'https://github.com/FlagOpen/HumanCOIN', external: true, primary: false,
+    label: { en: 'GitHub', zh: 'GitHub' } },
 ] as const
 </script>
 
@@ -118,8 +121,28 @@ const ACTIONS = [
             <path d="M4 1.8h5.2L13 5.4v8.8H4z" />
             <path d="M9 1.8v3.8h4M6 8.5h4.5M6 11h4.5" />
           </svg>
-          <svg v-else class="nav__ico" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
-            <path d="m5.5 4.5-3.5 3.5 3.5 3.5M10.5 4.5 14 8l-3.5 3.5" />
+          <svg
+            v-else-if="action.id === 'docs'"
+            class="nav__ico"
+            viewBox="0 0 16 16"
+            width="13"
+            height="13"
+            aria-hidden="true"
+          >
+            <path d="M8 4.2C6.7 3.3 5 3 3 3.2v9.1c2-.2 3.7.1 5 1V4.2Z" />
+            <path d="M8 4.2c1.3-.9 3-1.2 5-1v9.1c-2-.2-3.7.1-5 1V4.2Z" />
+          </svg>
+          <svg
+            v-else
+            class="nav__ico nav__ico--mark"
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            aria-hidden="true"
+          >
+            <path
+              d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
+            />
           </svg>
           <span class="nav__act-label">{{ t(action.label) }}</span>
         </a>
@@ -282,6 +305,12 @@ const ACTIONS = [
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* The GitHub mark is a filled silhouette rather than a stroke drawing, so the
+   rules above would hollow it out. */
+.nav__ico--mark {
+  fill: currentColor;
+  stroke: none;
+}
 
 .nav__lang {
   margin-left: 0.2rem;
@@ -385,12 +414,21 @@ const ACTIONS = [
   .nav__logo { height: 16px; }
   .nav__wordmark { height: 19px; top: -1px; }
 }
-/* Below this the three links would push the bar past the viewport, so they
-   collapse to their glyphs; the label survives as the link's accessible name. */
-@media (max-width: 440px) {
-  .nav__actions { gap: 0.5rem; }
+/* Below this four links with their labels would push the bar past the
+   viewport, so they collapse to their glyphs — except the primary action, whose
+   word is the point of the bar. The label survives as the link's accessible
+   name either way. */
+@media (max-width: 820px) {
+  .nav__actions { gap: 0.55rem; }
   .nav__act-label { display: none; }
   .nav__ico { margin-right: 0; }
+  .nav__act--primary .nav__act-label { display: inline; }
+  .nav__act--primary .nav__ico { margin-right: 0.3rem; }
+}
+/* and here even that word goes */
+@media (max-width: 500px) {
+  .nav__act--primary .nav__act-label { display: none; }
+  .nav__act--primary .nav__ico { margin-right: 0; }
 }
 
 /* with the contents column hidden, the bar simply rides the article */
