@@ -1,240 +1,836 @@
 # HumanCOIN
 
-> 📖 English docs: [README.md](README.md)
+<p align="center">
+  <img src="assets/cover.jpg" alt="HumanCOIN 报告封面：三层测量、代理信号与场景覆盖" width="100%">
+</p>
 
-**面向真实场景的多传感器、多频率数据集扩展，基于 LeRobot 构建** — 各传感器按独立采样率存储，每个传感器一个 parquet 文件，查询时按时间窗口动态对齐。
+**一个 12,500 小时的第一视角操作数据集：在统一任务本体与统一时间轴上，按三种测量深度记录动作背后的意图信号——注视、表面肌电与脑电。**
+
+<p align="center">
+  <a href="https://flagopen.github.io/HumanCOIN/">项目主页</a> ·
+  <a href="https://arxiv.org/abs/2611.26434">论文（arXiv:2611.26434）</a> ·
+  <a href="https://flagopen.github.io/HumanCOIN-DataManager/">数据门户</a>
+</p>
+
+> 📖 English docs: [README.md](README.md)
 
 ---
 
 ## 目录
 
-- [HumanCOIN](#humancoin)
-  - [目录](#目录)
-  - [1. 动机：为什么需要多频率支持](#1-动机为什么需要多频率支持)
-  - [2. 安装](#2-安装)
-  - [3. 快速开始](#3-快速开始)
-  - [4. Demo 与可视化](#4-demo-与可视化)
-    - [4.1 运行 Demo](#41-运行-demo)
-    - [4.2 Demo 1：写入（01write_simple.py）](#42-demo-1写入01write_simplepy)
-    - [4.3 Demo 2：读取（01read_simple.py）](#43-demo-2读取01read_simplepy)
-    - [4.4 Demo 3：对齐容差（02tolerance_example.py）](#44-demo-3对齐容差02tolerance_examplepy)
-    - [4.5 Demo 4：Window 模式（03window_example.py）](#45-demo-4window-模式03window_examplepy)
-    - [4.6 Demo 5：Delta 时间戳（04delta_example.py）](#46-demo-5delta-时间戳04delta_examplepy)
-    - [4.7 Demo 6：异步传感器启动（05async_startup_example.py）](#47-demo-6异步传感器启动05async_startup_examplepy)
-    - [4.8 Demo 7：音频（06audio_example.py）](#48-demo-7音频06audio_examplepy)
-    - [4.9 可视化操作](#49-可视化操作)
-  - [5. 核心概念](#5-核心概念)
-    - [5.1 每特征独立存储](#51-每特征独立存储)
-    - [5.2 Task 即主时钟](#52-task-即主时钟)
-    - [5.3 Window 参数](#53-window-参数)
-  - [6. API 参考](#6-api-参考)
-    - [创建数据集](#创建数据集)
-    - [Feature 定义格式](#feature-定义格式)
-    - [写入](#写入)
-    - [读取](#读取)
-    - [读取返回结构](#读取返回结构)
-  - [7. 架构设计](#7-架构设计)
-  - [8. 与原生 LeRobotDataset 对比](#8-与原生-lerobotdataset-对比)
-  - [9. 致谢](#9-致谢)
-
+- [这是什么](#这是什么)
+- [快速开始](#快速开始)
+- [下载数据](#下载数据)
+- [数据里有什么](#数据里有什么)
+- [磁盘上的组织](#磁盘上的组织)
+- [读取与对齐](#读取与对齐)
+- [可视化](#可视化)
+- [使用数据：默认帧与意图代理输入](#使用数据默认帧与意图代理输入)
+- [数据是怎么采集的](#数据是怎么采集的)
+- [与其他数据集对比](#与其他数据集对比)
+- [录制自己的多频流](#录制自己的多频流)
+- [引用与许可](#引用与许可)
+- [致谢](#致谢)
+- [合作机构](#合作机构)
 
 ---
 
-## 1. 动机：为什么需要多频率支持
+## 这是什么
 
-真实场景的数据采集往往需要多种传感器共同记录同一过程：相机记录视觉信息，IMU 记录运动，EEG 和 EMG 记录生理信号。人体行为研究、可穿戴设备、实验记录和环境感知等场景，都需要联合使用这些数据。不同传感器的采样率、启动时间和数据形态各不相同，因此需要保留各自的时间序列，并在使用时按时间对齐。
+多数第一视角数据集记录的是「观测–动作」对：相机看到了什么，手怎么动。用这种数据训练的策略学习 `π(a | o)`，把操作者的意图压进网络权重；世界模型则预测下一帧观测，而不是产生动作的那个状态。策略失败时，数据无法告诉你究竟是目标错了、握力估错了，还是漏掉了一个错误信号。
 
-常见传感器的采样率差异很大：
+HumanCOIN 记录的是中间那一段。每条 episode 都带有三种**可穿戴的意图代理信号**，它们沿着从决策到动作的「意图通路」分布：
 
-| 传感器 | 典型频率 | 维度 | 示例 |
-|--------|---------|------|------|
-| 相机 RGB | 30 / 60 Hz | 480×640×3 | 场景相机 + 可穿戴相机 |
-| IMU | 50-1000 Hz | 6 (accel×3 + gyro×3) | 加速度计 + 陀螺仪 |
-| EEG | 256 / 512 / 1000 Hz | 8-256 通道 | 脑电信号 |
-| EMG | 20-500 Hz | 4-16 通道 | 肌电信号 |
+- **注视（gaze）**——手出发之前，注意力先落在哪里；
+- **表面肌电（sEMG）**——接触之前，前臂如何为握力加载；
+- **头皮脑电（EEG）**——运动命令下达之前，皮层准备了什么。
 
-将不同频率的数据强制合并到统一帧率的表中，通常需要对低频数据上采样、对高频数据降采样或聚合，这可能损失原始采样信息。本项目基于 LeRobot 的数据集基础设施，扩展了按传感器独立存储和按时间查询的能力。
+这些代理信号不是意图本身，而是对意图的有损测量。数据集的设计目标是让模型能够从 `m = (m_gaze, m_emg, m_eeg)` 学习 `p(a | o, m)`，并与 `p(a | o)` 对比。报告结果时需要保留这个区别：HumanCOIN 提供的是意图的**测量与估计**，不是意图的隐变量标签。
 
-**humancoin 的解决方案**：每个传感器独立存储为时间索引的 parquet 文件。读取时通过 `window` 参数定义"如何围绕查询时间戳聚合数据"——无需预先重采样。
+### 形式化视角
 
-**写入** — `add_frame` 按 key 分流到对应 feature 缓冲，`save_episode()` 时各自落盘：
+令 `o` 为观测、`a` 为动作、`z` 为操作者的潜在意图。标准策略把 `z` 边缘化掉：
+
+$$
+p(a \mid o) = \int p(a \mid o, z)\, p(z \mid o)\, \mathrm{d}z .
+$$
+
+HumanCOIN 不试图直接观测 `z`，而是记录意图通路上的代理向量：
+
+$$
+m_j = f_j(z_j, o) + \varepsilon_j, \qquad j \in \{\mathrm{gaze},\ \mathrm{emg},\ \mathrm{eeg}\},
+$$
+
+其中 `f_j` 是传感器相关的有损读出函数，`ε_j` 是噪声；`m` 不是 `z` 的充分统计量。因此，这份数据支持的监督信号是**以代理信号为条件的策略**
+
+$$
+p(a \mid o, m),
+$$
+
+以及代理模型 `p(m | o)`。
+
+这份语料对应两个相互独立的监督问题：
+
+$$
+\max_\phi\ \mathbb{E}_{(o,m)}\left[\log p_\phi(m \mid o)\right],
+\qquad
+\max_\theta\ \mathbb{E}_{(o,m,a)}\left[\log p_\theta(a \mid o, m)\right].
+$$
+
+前者在记录了 `m` 的地方学习代理模型；后者在有动作或动作标签的地方学习策略。把二者分开，正是层级设计的意义：浅层可以在没有机器人的情况下提供 `p(m | o)` 监督，L3 则提供策略所需的 `(o, m, a)` 配对。
+
+真正要回答的问题是：代理信号是否携带了观测之外的动作信息。对应的量是条件互信息
+
+$$
+I(a; m \mid o) = \mathbb{E}[\log p(a \mid o, m) - \log p(a \mid o)],
+$$
+
+它在理论上非负，实践中必须用留出数据估计：显著大于零说明 `m` 增加了信息，和零无法区分则说明在该任务上意图相对观测是冗余的。受控 L3 提供的实测注视、位姿与手指运动学 `y` 是估计值的参考目标，而不是 `z` 的真值。
+
+<p align="center">
+  <img src="assets/intent-pathway.jpg" alt="动作策略、世界模型与以代理信号为条件的意图" width="70%">
+  <br>
+  <sub>动作策略把意图折进权重；世界模型预测未来；HumanCOIN 直接记录意图的代理信号。图源：论文。</sub>
+</p>
+
+### 三个层级
+
+这不是三个互不相干的数据集，而是一组嵌套的层级：每一层继承下一层的全部代理信号，再增加一种。信号越深，采集成本越高，小时数越少。
+
+| 层级 | 小时数 | 新增的意图代理 | 典型数据流 | 采集环境 | 场景类别 |
+|------|--------|----------------|------------|----------|----------|
+| **L1 · 注意**<br>Attention | 10,000 | 从头环视频估计注视（30 Hz） | 2–6 路头戴相机（20–60 fps）、深度、6-DoF/身体/手部位姿 | 开放环境，日常活动，不设脚本 | 38 类 |
+| **L2 · 用力**<br>Exertion | 2,000 | 双侧表面肌电，每臂 8 通道，2 kHz | 固定 4 目头环、2 路腕部视角、肌电原始与去噪轨迹 | 开放环境，任务单驱动的半结构化任务 | 21 类 |
+| **L3 · 认知**<br>Cognition | 500 | 脑电：受控环境 128 通道 @1 kHz；开放环境 32/8 通道 @250 Hz | 4 路头部 + 2 路腕部 + 眼动相机 + 第三人称、眼动仪、3 个 6-DoF tracker、手部骨架 | 约 350 h 受控桌面 + 约 150 h 开放 | 9 类 |
+
+L1 不含肌电和脑电；L2 增加肌电；L3 增加脑电，并在受控子集中直接测量注视、头/腕位姿和手指运动学。受控 L3 的实测值是浅层估计值的**参考**，而不是意图本身的真值。
+
+### 一览
+
+| 维度 | 数值 |
+|------|------|
+| 规模 | 12,500 小时 · 30 fps 下约 13.5 亿个主帧 · 6 个采集点 |
+| 场景 | 5 个功能区（居住、商业、专业、工业、公共）共 38 类，另有 1 个残差类 |
+| 任务 | 99 个任务动词 + 46 个动作动词；每个 episode 约 10 个步骤阶段 |
+| 物体 | 635 个标注类别；839 个实测实例，记录形状、尺寸、重量、材质与颜色 |
+| 信号 | 多视角 RGB、度量深度与点云、6-DoF 头/腕位姿、手指运动学、注视、sEMG、EEG、IMU、麦克风 |
+| Episode | 平均 88 秒（L1 101 秒、L2 65 秒、L3 60 秒），长度分布峰值在 52 秒 |
+| 格式 | LeRobot 风格：每个数据流一个 Parquet，外加主索引、MP4 视频，以及存在时的 WAV 音频；具体 `codebase_version` 由各发布的 `meta/info.json` 声明 |
+| 许可 | 数据 CC BY-NC 4.0；代码 Apache-2.0 |
+
+<p align="center">
+  <img src="assets/overview.jpg" alt="HumanCOIN 数据分布：层级、片段长度、任务深度、场景、动词与物体" width="100%">
+  <br>
+  <sub>一图看全：三层小时数、episode 长度、任务深度、38 类场景、99 个任务动词与 635 类物体。图源：论文。</sub>
+</p>
+
+<p align="center">
+  <img src="assets/scenes.jpg" alt="38 类场景各一张头戴相机画面" width="75%">
+  <br>
+  <sub>每个场景类取一帧头戴相机画面，按功能区排列。图源：论文。</sub>
+</p>
+
+**目录与语料不是一回事。** 12,500 小时是论文描述的完整语料规模，数据分批发布，因此门户中的实时目录会小于这个数字并持续增长——2026 年 11 月的快照约为 689 个仓库、12,119 个 episode、530 小时（约 7.5 TB）。今天能下载什么，请以[数据门户](https://flagopen.github.io/HumanCOIN-DataManager/)的统计和数据集卡片为准。后续批次的数据访问，门户给出的联系方式是 `humancoin@163.com`。
+
+---
+
+## 快速开始
+
+从零到解出一帧真实数据，大约五分钟。下面的例子是一个 65 MB、29 秒的 L1 仓库；换成门户里的任何其他仓库，流程相同。
+
+### 1. 安装
+
+```bash
+pip install -U "humancoin>=0.1.1"
+```
+
+支持 Python 3.10–3.13。包会固定 LeRobot 0.3.3，并自带下载器、数据读取器和两个可视化器。
+
+### 2. 选一个数据集并下载
+
+打开 **[HumanCOIN 数据门户](https://flagopen.github.io/HumanCOIN-DataManager/)**，按层级、模态、场景、任务或分辨率筛选，勾选一个或多个仓库，选择 Hugging Face 或 ModelScope，然后点 **Generate Download Command**。门户会自动填好仓库名和所选数据源对应的修订版本：
+
+```bash
+humancoin-download --hub huggingface \
+  --datasets 'HumanCOIN/l1_study_room_fill_task_1920x1456_30fps_2views' \
+  --revision 'b1b5d76c9a06d100733f4e4eac1a3e5f8942dfba' \
+  --target-dir ./data --max-workers 8
+```
+
+文件会落在 `./data/HumanCOIN/<仓库名>/`。L1 仓库会把一条或多条任务录制放在各自的 `<task-name>/` 目录下，每个任务目录才是一个完整数据集；L2/L3 仓库是扁平的，可以直接从仓库根目录加载。多数数据集需要申请访问：先在 Hugging Face 数据集页面申请并等待通过，然后在同一个终端里登录，再执行下载：
+
+```bash
+hf auth login
+hf auth whoami
+```
+
+使用 ModelScope 时，先在魔搭申请访问权限，用同一账号创建访问令牌并导出 `MODELSCOPE_TOKEN`；完整流程见 [ModelScope：申请、令牌与下载](#modelscope申请令牌与下载)。
+
+> **想直接看最深的一层？** `l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8` 是一条 28 秒、188 MB 的 L3 episode，包含 128 通道脑电和 8 通道肌电，是查看完整传感器组合成本最低的入口。
+
+### 3. 读一帧
+
+```python
+from pathlib import Path
+from humancoin import HumanCOINDataset
+
+REPO = "HumanCOIN/l1_study_room_fill_task_1920x1456_30fps_2views"
+repo_dir = Path("data") / REPO
+task_dir = repo_dir if (repo_dir / "meta/info.json").is_file() else next(
+    p for p in sorted(repo_dir.iterdir()) if (p / "meta/info.json").is_file()
+)
+
+ds = HumanCOINDataset(repo_id=REPO, root=task_dir)
+
+print(task_dir.name)                        # l1_study_room_fill_box_<hash>
+print(len(ds), "frames @", ds.fps, "fps")   # 882 frames @ 30.0 fps
+frame = ds[0]
+
+print(frame["observation.images.head_left_rectified"].shape)  # (3, 1456, 1920)
+print(frame["observation.head_pose"].shape)                   # (7,)
+print(frame["eye_gaze_predict"].shape)                        # (2,)
+print(frame["task"])                                          # 任务字符串
+```
+
+`frame` 里的每个键都来自某个任务目录中的某条 episode。`ds[i]` 先查第 i 个主时钟时间戳，再围绕该时刻解析每一路数据流；没有任何数据流在写入时被预重采样。对于扁平的 L2/L3 仓库，直接把仓库根目录作为 `root` 传入。
+
+### 4. 看一看
+
+```bash
+# 指向上一步打印的任务目录（扁平的 L2/L3 仓库直接用仓库根目录）
+TASK=$(dirname "$(dirname "$(find "data/HumanCOIN/l1_study_room_fill_task_1920x1456_30fps_2views" -path '*/meta/info.json' | head -n 1)")")
+humancoin-visualize-web "$TASK"
+```
+
+浏览器界面默认打开 `http://127.0.0.1:8000`，可以逐帧拖动、拉时间窗、查看每一路信号，并对脑电/肌电做滤波。桌面可视化器和快捷键见[可视化](#可视化)。
+
+---
+
+## 下载数据
+
+有两种方式获取数据：用门户生成 `humancoin-download` 命令，或手写同样的命令。推荐前者，因为门户会替你解析仓库名、修订版本、大小和访问权限。
+
+### 数据门户
+
+**[HumanCOIN 数据门户](https://flagopen.github.io/HumanCOIN-DataManager/)** 是已发布数据的公开目录。
+
+<p align="center">
+  <img src="assets/portal-explore.png" alt="数据门户 Explore Datasets：搜索、排序与带预览/下载操作的数据集卡片" width="78%">
+  <br>
+  <sub>Explore Datasets：搜索、比较已发布仓库；每张卡片给出传感器集合、大小，以及 Preview / Download 操作。</sub>
+</p>
+
+<p align="center">
+  <img src="assets/portal-preview.png" alt="数据门户数据集卡片：任务、传感器元数据、episode、时长、大小、许可与 Get Download Command" width="62%">
+  <br>
+  <sub>数据集卡片：任务描述、逐流元数据、episode 数、时长、大小、许可，以及 <b>Get Download Command</b> 入口。</sub>
+</p>
+
+1. **浏览。** 首页显示已发布仓库数、episode 数、总时长和 Hugging Face 下载量。**Explore Datasets** 可以按数据层级（L1/L2/L3）、模态（RGB、深度、手部位姿、注视、眼动相机、肌电、脑电、手套/Manus、音频、IMU）、场景、任务和主相机分辨率筛选。
+2. **预览。** 数据集卡片给出任务描述、episode 数、时长、大小、分辨率、许可和完整的流列表。完整视频预览从 Hugging Face 流式加载，受限仓库需要先获得访问权限。
+3. **选择。** 勾选一个或多个完整仓库。选择会保存在浏览器里，也可以导出/导入 `selection.json`，便于分享可复现的数据子集。
+4. **选择源。** Hugging Face 或 ModelScope。有的仓库只在一个平台发布；门户会提示当前平台是否可用。
+5. **生成命令。** 生成的命令会选择卡片上标注的修订版本——Hugging Face 上是 commit，ModelScope 上通常是 `master`——使下载内容对应目录快照：
 
 ```mermaid
 flowchart LR
-    AF["add_frame(key, value)"]
-    IX["MasterIndex record_frame(ts, task)"]
-    PF["ParquetFeature buffer.append(ts, data)"]
-    VF["VideoFeature 保存 PNG + 时间戳列表"]
-    AuF["AudioFeature 缓冲音频块 + 时间戳列表"]
-
-    MI[("master_index.parquet timestamp | task | frame_index")]
-        P1[("imu.parquet 1000Hz × 6d")]
-        P2[("eeg.parquet 256Hz × 8d")]
-        P3[("state.parquet 30Hz × 7d")]
-        C1[("head_rgb.parquet timestamps only")]
-        V1[("head_rgb.mp4 30fps video")]
-        A1[("mic.parquet timestamp | num_samples")]
-        W1[("mic.wav 16kHz audio")]
-
-    AF -->|"key = task"| IX
-    AF -->|"key = sensor<br/>imu / eeg / state"| PF
-    AF -->|"key = video"| VF
-    AF -->|"key = audio"| AuF
-    IX --> MI
-    PF --> P1
-    PF --> P2
-    PF --> P3
-    VF --> C1
-    VF --> V1
-    AuF --> A1
-    AuF --> W1
-
-    style AF fill:#fafafa,stroke:#9e9e9e,color:#000
-    style IX fill:#e1f5fe,stroke:#4fc3f7,color:#000
-    style PF fill:#fafafa,stroke:#9e9e9e,color:#000
-    style VF fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style AuF fill:#e8f5e9,stroke:#66bb6a,color:#000
-    style MI fill:#e1f5fe,stroke:#4fc3f7,color:#000
-    style P1 fill:#fff3e0,stroke:#ff9800,color:#000
-    style P2 fill:#e8f5e9,stroke:#4caf50,color:#000
-    style P3 fill:#fce4ec,stroke:#e91e63,color:#000
-    style C1 fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style V1 fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style A1 fill:#e8f5e9,stroke:#4caf50,color:#000
-    style W1 fill:#e8f5e9,stroke:#4caf50,color:#000
+    A["门户：筛选、预览、勾选"] --> B["选择 Hugging Face / ModelScope"]
+    B --> C["生成命令<br/>仓库 + 修订版本"]
+    C --> D["humancoin-download"]
+    D --> E["data/HumanCOIN/REPO/"]
+    E --> F["HumanCOINDataset<br/>root = 任务目录"]
 ```
-
-**读取** — 先查 `master_index` 得到主时钟时间戳，再按时间戳查询各 feature：
-
-```mermaid
-flowchart TD
-    IDX["ds[10]"] -->|"① 查第 10 帧"| MI[("master_index.parquet timestamp | task | frame_index")]
-    MI -->|"② 取出时间戳"| TS["t = 0.333s"]
-    TS -->|"③ nearest<br/>找时间最近的行"| P3[("state.parquet 30Hz × 7d")]
-    TS -->|"③ window=(-0.033, 0] 区间内全部行"| P1[("imu.parquet 1000Hz × 6d")]
-    TS -->|"③ window=(-0.033, 0] 区间内全部行"| P2[("eeg.parquet 256Hz × 8d")]
-    TS -->|"③ nearest 找时间最近的行"| C1[("head_rgb.parquet timestamp")]
-    C1 -->|"④ 得到 frame_index"| V1[("rgb → 480×640×3")]
-    P3 -->|"1 行"| RS["state → [7]"]
-    P1 -->|"33 行"| RI["imu → [33, 6]"]
-    P2 -->|"8 行"| RE["eeg → [8, 8]"]
-    V1 -->|"1 帧"| RV["head_rgb → [3, 480, 640]"]
-
-    style IDX fill:#fafafa,stroke:#9e9e9e,color:#000
-    style MI fill:#e1f5fe,stroke:#4fc3f7,color:#000
-    style TS fill:#fafafa,stroke:#9e9e9e,color:#000
-    style P3 fill:#fce4ec,stroke:#e91e63,color:#000
-    style P1 fill:#fff3e0,stroke:#ff9800,color:#000
-    style P2 fill:#e8f5e9,stroke:#4caf50,color:#000
-    style C1 fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style V1 fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style RS fill:#fce4ec,stroke:#e91e63,color:#000
-    style RI fill:#fff3e0,stroke:#ff9800,color:#000
-    style RE fill:#e8f5e9,stroke:#4caf50,color:#000
-    style RV fill:#f3e5f5,stroke:#9c27b0,color:#000
-```
-
-查询 `ds[10]`（t=0.333s）的结果：
-- `state` → 最近邻匹配 → `[7]`
-- `imu` → `(-0.033, 0]` 窗口内 33 个读数 → `[33, 6]`
-- `eeg` → `(-0.033, 0]` 窗口内 8 个读数 → `[8, 8]`
-- `head_rgb` → timestamp parquet 最近邻 → `frame_index` → 解码对应帧 → `[3, 480, 640]`
-
-## 2. 安装
-
-Python **3.10–3.13**（已在 Python 3.12 验证），当前固定依赖 **LeRobot 0.3.3**。
-
-从 [PyPI](https://pypi.org/project/humancoin/) 安装：
 
 ```bash
-pip install humancoin
+humancoin-download --hub huggingface \
+  --datasets 'HumanCOIN/<repository>' \
+  --revision '<commit-hash>' \
+  --target-dir ./data --max-workers 8
 ```
 
-也可以从源码安装：
+在完成认证的同一个终端里执行。加 `--dry-run` 可以只打印目标路径和 include/exclude 规则，不实际下载。
+
+### 仓库命名
+
+仓库名本身包含足够的信息，方便不打开卡片也能筛选：
+
+```text
+l1_study_room_fill_task_1920x1456_30fps_2views
+│  │          │    │        │      │     └─ 发布的相机视角数
+│  │          │    │        │      └─ 帧率
+│  │          │    │        └─ 主相机分辨率
+│  │          │    └─ 任务
+│  │          └─ 场景
+│  └─ 层级
+```
+
+L2/L3 会在名字末尾追加传感器组合，例如 `..._9views_emg8` 或 `..._12views_eeg128_emg8`。场景、任务和视角数都能在门户里直接搜索，通常不需要手工解析名字。
+
+### 命令行参数
 
 ```bash
-git clone https://github.com/FlagOpen/HumanCOIN
-cd HumanCOIN
-pip install -e .
+humancoin-download --help
+# 也可以：python -m humancoin.download --help
 ```
 
-依赖说明：
-
-| 依赖 | 用途 |
+| 参数 | 含义 |
 |------|------|
-| `lerobot` | 基础数据集框架（继承 LeRobotDataset） |
-| `pyarrow` | parquet 文件读写 |
-| `numpy` / `torch` | 数据处理 |
-| `av`（PyAV） | 视频编码/解码 |
-| `matplotlib` | 可视化 |
-| `scipy` | 网页可视化信号滤波 |
+| `--hub {huggingface,modelscope}` | 数据源（默认 `huggingface`） |
+| `--datasets A B ...` | 一个或多个仓库名或 `owner/name`；`--ds_lists` 是别名 |
+| `--revision REV` | 分支、标签或 commit；门户会填入对应数据源的修订版本（Hugging Face 上是 commit，ModelScope 通常是 `master`） |
+| `--target-dir DIR` | 下载根目录（默认 `~/.cache/huggingface/lerobot`）；文件写到 `DIR/HumanCOIN/<name>` |
+| `--max-workers N` | 并行下载的文件数（默认 8） |
+| `--include ...` / `--exclude ...` | 相对仓库根目录的 glob，用于部分下载 |
+| `--dry-run` | 只打印计划，不下载 |
+| `--token TOKEN` | 访问令牌；优先使用 `HF_TOKEN` / `MODELSCOPE_TOKEN`（也接受 `MS_TOKEN`） |
+| `--namespace NAME` | 裸仓库名使用的命名空间（默认 `HumanCOIN`） |
 
-### 下载 HumanCOIN 数据集
-
-在 [Hugging Face](https://huggingface.co/HumanCOIN) 或 [ModelScope](https://www.modelscope.cn/organization/HumanCOIN) 浏览数据集。这两个地址是组织页面，下载时需指定所选平台上的具体数据集名称。
+示例：
 
 ```bash
-pip install humancoin
+# 一次下载多个仓库
+humancoin-download --hub huggingface \
+  --datasets 'HumanCOIN/l1_study_room_fill_task_1920x1456_30fps_2views' \
+             'HumanCOIN/l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8' \
+  --target-dir ./data --max-workers 8
 
-# 将 DATASET_NAME 替换为实际数据集仓库名
-humancoin-download --hub huggingface --datasets DATASET_NAME --target-dir ./data
-humancoin-download --hub modelscope --datasets DATASET_NAME --target-dir ./data
+# 下载前先看落盘位置
+humancoin-download --datasets 'HumanCOIN/l1_study_room_fill_task_1920x1456_30fps_2views' \
+  --target-dir ./data --dry-run
 
-# 仅下载指定文件（部分下载，不保证能够加载完整数据集）
-humancoin-download --datasets DATASET_NAME --include "meta/*" README.md --target-dir ./data
-
-# 批量指定数据集；仅预览计划，不下载
-humancoin-download --datasets DATASET_A DATASET_B --target-dir ./data --dry-run
-# 也可使用：python -m humancoin.download ...
+# 扁平的 L2/L3 仓库：只要元数据和标定（体积小，但不是可加载的完整数据集）
+humancoin-download --datasets 'HumanCOIN/<repository>' --target-dir ./data \
+  --include "meta/*" "calibrations/*"
 ```
 
-默认组织为 `HumanCOIN`，也支持显式传入 `owner/name`。`--ds_lists` 是 `--datasets` 的别名。保存路径为 `<target-dir>/HumanCOIN/<数据集名>`，默认目标目录为 `~/.cache/huggingface/lerobot`。重复执行时由平台 SDK 复用已下载文件；可用 `--revision` 指定版本、`--max-workers` 设置下载并发数。私有或受限数据集需要账号具备访问权限，并通过 `HF_TOKEN`、`MODELSCOPE_TOKEN` 或 `--token` 提供凭据；ModelScope 使用轻量 `modelscope-hub` SDK，通过客户端传入凭据或读取其登录缓存，也兼容 `MS_TOKEN`。单个数据集失败后仍继续下载其余数据集，存在失败时命令返回非零退出码。
+重复执行是安全的：Hub SDK 会复用已下载的文件，中断的传输可以继续。某个仓库失败不会中断其余仓库；只要有失败，进程最终返回非零退出码。
+
+### ModelScope：申请、令牌与下载
+
+ModelScope 提供同一目录的镜像。下载受限仓库时：
+
+<p align="center">
+  <img src="assets/portal-selection.png" alt="数据门户选择栏：已选 L2 仓库、ModelScope 数据源与 Generate Download Command" width="100%">
+  <br>
+  <sub>勾选一个或多个完整仓库，把数据源切到 <b>ModelScope</b>，再点 <b>Generate Download Command</b>。同一个选择栏可以导出 <code>selection.json</code> 供下次导入。</sub>
+</p>
+
+1. 用将要执行下载的账号，在 ModelScope 数据集页面申请访问权限。
+2. 用同一账号创建一个 [ModelScope 访问令牌](https://modelscope.cn/my/myaccesstoken)。
+3. 在用于下载的 Bash 终端里交互式导出令牌，避免它进入 shell 历史：
+
+```bash
+read -rsp 'ModelScope Token: ' MODELSCOPE_TOKEN
+printf '\n'
+export MODELSCOPE_TOKEN
+```
+
+4. 执行门户生成的命令。ModelScope 命令使用 `--hub modelscope`，修订版本通常是 `--revision 'master'`：
+
+```bash
+humancoin-download --hub modelscope \
+  --datasets 'HumanCOIN/l2_workroom_write_workpiece_markings_left_1920x1200_30fps_9views_emg8' \
+  --revision 'master' \
+  --target-dir ./data --max-workers 8
+```
+
+文件会落在 `./data/HumanCOIN/<仓库名>/`，任务目录布局与 Hugging Face 路径一致。`--dry-run`、`--include`/`--exclude` 以及门户导出的 `selection.json` 在两个源上用法相同，区别只在 hub 和修订版本。下载器会读取 `MODELSCOPE_TOKEN` 或 `MS_TOKEN`；也可以用 `--token`，但交互式导出可以避免把密钥写进可能被保存的命令。`master` 是可变分支；需要字节级复现时，请固定到 commit 或 tag（若有）。
+
+### 访问、磁盘与校验
+
+- **受限数据。** 多数 HumanCOIN 仓库是 gated（自动审批）。先在 Hugging Face 数据集页面申请访问，等待通过，再 `hf auth login`。下载器返回 401/403，通常是审批未通过，或当前 token 属于另一个账号。
+- **ModelScope。** 申请访问、导出 `MODELSCOPE_TOKEN` 与执行门户命令的完整流程见 [ModelScope：申请、令牌与下载](#modelscope申请令牌与下载)。
+- **磁盘。** 体积差异很大：快速开始用的 L1 示例只有 65 MB，而 L2/L3 仓库通常为多 GB，最大的超过 60 GB；完整已发布目录约 7.5 TB。选层级之前先看卡片上的大小；`df -h` 比下载失败便宜。
+- **校验。** 扁平的 L2/L3 仓库在根目录有 `meta/info.json`；L1 仓库则在每个 `<task>/meta/info.json` 下。无论哪种，完整任务目录还应至少有一个 `data/chunk-*/episode_*/master_index.parquet`。只有 `meta/` 没有 `data/`，说明下载不完整或仍在进行。
+
+---
+
+## 数据里有什么
+
+一条 episode 是「一个人在真实场景里完成一项任务」的时间对齐记录：身体、场景和动作背后的信号，被放进同一个坐标系和同一条时钟。
+
+<p align="center">
+  <img src="assets/episode.jpg" alt="一条受控 L3 episode 的组成" width="100%">
+  <br>
+  <sub>一条受控 L3 episode，t = 27.6 s。(a) 度量点云，叠加头部位姿、双手骨架与 6-DoF 腕部位姿；(b) 八路同步视角与深度；(c) 步骤与物体标注；(d) 同一时间区间内的注视、肌电与脑电。图源：论文。</sub>
+</p>
+
+### 视角与几何
+
+- **头部相机。** L1 使用来自 13 家厂商的 14 款第三方头环：2–6 个镜头，20–60 fps，从 512×512（校正后）到 3840×1200。L2/L3 使用头戴多相机设备，通常是 1920×1200、30 fps 的四目；前向立体对硬件同步。发布流可能被降采样（例如部分 L3 仓库的头部视角是 640×360），因此一律以 `info.json` 里的 shape 为准。
+- **腕部与第三人称。** L2 增加两路腕部视角；L3 增加两个 640×480 腕部相机、一路 1600×1200 的眼动仪场景相机，并在受控子集中加入第三人称 RGB-D 视角。按套件不同，L3 仓库会发布 5–12 路视角。
+- **深度与点云。** 深度由前向立体对经 FoundationStereo 重建，连同产生它的内参一起存储，再逐帧投影为点云。发布中同时提供原始与校正版本时就都保留；校正参数随 episode 一起发布。
+- **位姿与手。** 头部、双腕和胸部共享一个度量坐标系：`+x` 向左、`+y` 向上、`+z` 向前；平移单位为毫米，关节角单位为度。位姿流可能存成 7 个数（位置 + 四元数），也可能存成 6 个数（位置 + 欧拉角）；读取 `names` 即可确认。受控 L3 用 3 个 6-DoF tracker（设备频率约 800 Hz）和 20 节点手套直接测量位姿与每只手 20 个关节角；L1、L2 和开放 L3 的同一批量则从视频估计。
+
+### 意图代理信号
+
+| 代理 | 典型数据流 | 频率 | 实测还是估计 |
+|------|------------|------|--------------|
+| 注视 | `observation.eye_gaze`（受控 L3）；`eye_gaze_predict`（L1、L2、开放 L3） | 实测 200 Hz；估计 30 Hz | 受控 L3 实测，其余估计 |
+| 表面肌电 | `observation.left_wrist_emg` 及其原始/去噪变体（`*_raw`、`*_denoise`，命名随发布变化） | 2 kHz，每臂 8 通道 | L2 起为实测 |
+| 脑电 | `observation.eeg_raw`、`observation.eeg_denoise`（不同发布批次命名略有差异） | 受控 1 kHz × 132 列（128 通道帽）；开放 250 Hz × 32/8 通道 | L3 实测 |
+
+注视坐标是场景相机像素（受控 L3），或校正后头部视角的像素（其余情况）。肌电发布原始与去噪轨迹；需要包络时由使用者自行计算。脑电按采集、滤波、修复等阶段分别发布；具体列名以每个仓库的 `meta/info.json` 为准。
+
+
+### 标注
+
+标注以「步骤」为单位，而不是只给整段视频打一个标签。每个步骤包含一句描述、一个**任务动词**（99 类：wipe、open、fold、close、arrange……）、使用的手、接触到的物体，以及一组**动作动词**（46 类，平均每步 2.5 个：pick、place、move、grasp……）。在 L2/L3，物体记录可以包含实测的形状、尺寸、重量、材质和颜色（是否完整随发布批次变化），因此肌电活动可以直接对照物体属性，而不是只依赖标签。
+
+每条 episode 还带有任务阶段、关键事件、状态变化，以及受控 L3 中「运动想象 / 执行」的阶段标记。标注以结构化 JSON 随 episode 发布，同时导出为 LeRobot 的语言列供训练使用。
+
+---
+
+## 磁盘上的组织
+
+一个**任务目录**才是一个自包含的 LeRobot 风格数据集。仓库可能是「根目录就是任务目录」（L2/L3），也可能在根目录下放多个任务目录（L1）。具体的数据流集合随层级和套件变化，目录结构不变。
+
+```text
+l1_study_room_fill_task_1920x1456_30fps_2views/     # 仓库
+├── README.md
+├── preview.jpg
+├── portal.yaml
+└── l1_study_room_fill_box_<hash>/                  # 任务目录 = 数据集根目录
+    ├── data/
+    │   └── chunk-000/
+    │       └── episode_000000/
+    │           ├── master_index.parquet            # timestamp | frame_index | episode_index | index | task_index
+    │           ├── observation.head_pose.parquet
+    │           ├── observation.hand_left_points.parquet
+    │           ├── observation.body_pose.parquet
+    │           └── ...                             # 每路信号一个 Parquet
+    ├── videos/
+    │   └── chunk-000/
+    │       ├── observation.images.head_left_rectified/
+    │       │   └── episode_000000.mp4
+    │       └── ...
+    ├── audios/                                     # 采集了麦克风时存在
+    │   └── chunk-000/...
+    ├── calibrations/
+    │   ├── dataset_manifest.json
+    │   ├── rectify_params.yaml
+    │   └── source_camera_calibration.json
+    ├── annotation/
+    │   └── episode_000000_structured.json
+    └── meta/
+        ├── info.json                               # 特征、形状、fps、窗口、路径模板
+        ├── episodes.jsonl
+        ├── episodes_stats.jsonl
+        ├── tasks.jsonl
+        ├── readme.json                             # 该任务的人类可读摘要
+        ├── collect_info.jsonl                      # 存在时：采集者、硬件、场景、物体
+        ├── alignment_check.jsonl                   # 存在时：逐流时间对齐审计
+        └── qc_reports.jsonl                        # 存在时：质检结论
+```
+
+L2 和 L3 仓库没有这一层：`data/`、`videos/`、`meta/` 直接位于仓库根目录。判断依据就是 `meta/info.json`——如果仓库根目录没有它，就进入包含它的那个子目录。元数据集合随发布批次略有差异：`info.json`、`episodes.jsonl`、`episodes_stats.jsonl`、`tasks.jsonl` 和 `readme.json` 是常见项；L2/L3 还可能包含 `collect_info.jsonl`、`alignment_check.jsonl`、`calibrations.jsonl`、`source_sessions.jsonl` 和 `qc_reports.jsonl`。
+
+每路信号是一个独立的 Parquet，按自己的时间基存储：
+
+```text
+timestamp (float64) | episode_index (int64) | channel_0 ... channel_D
+```
+
+- `timestamp` 是相对录制起点的秒数，按采集到的值存储。没有任何样本被吸附到主帧网格上，因此原生频率、设备抖动和丢帧都保留在文件里。
+- `master_index.parquet` 是固定频率的主干（已发布数据为 30 fps）。`ds[i]` 先查这里，再用每一路自己的时间戳解析其余数据。
+- 像素不存进 Parquet。RGB 视角是 30 fps 的 H.264 MP4；同名的 `observation.images.*.parquet` 记录每一帧的时间戳。原始版和校正版并列存放。
+- 有音频时，是 16 kHz 单声道 PCM WAV，外加一张记录每个主帧贡献多少采样的 Parquet。
+- 标定信息（相机内参与畸变、校正参数、tracker 到坐标系的变换、眼动仪标定）随 episode 一起发布，几何可以重新推导，而不是只能接受写入时的结果。
+- 命名是字面含义：`*_raw` 是采集到的原始流，`eeg_denoise` / `*_emg_denoise`（或 `.denoised`）是清洗后的轨迹，肌电包络可由清洗后的轨迹计算。
+
+不同发布批次可能多几个元数据文件，或少几路数据流。权威的特征列表永远是：
 
 ```python
-from humancoin import HumanCOINDataset
-
-ds = HumanCOINDataset(
-    repo_id="HumanCOIN/DATASET_NAME",
-    root="data/HumanCOIN/DATASET_NAME",
-)
-item = ds[0]
+for key, spec in ds.meta.features.items():
+    if key in {"timestamp", "frame_index", "episode_index", "index", "task_index"}:
+        continue
+    print(f"{key:48s} {spec.get('dtype', ''):8s} {tuple(spec.get('shape', ()))}")
 ```
 
-下载保留远端原始文件；加载要求数据集符合本项目支持的多频率目录结构，下载过程不会自动转换其他格式。
+---
 
-## 3. 快速开始
+## 读取与对齐
+
+### 主时钟与窗口
+
+数据集自身的帧率定义了一条**主时钟**。第 `i` 帧的时间戳是 `t = i / fps`（相对该 episode 的主时间基）。其他数据流保留各自的原生时间戳；读取 `ds[i]` 时，每一路围绕 `t` 按自己的 `window` 解析：
+
+| `window` | 返回值 | 典型用途 |
+|----------|--------|----------|
+| `None`（默认） | 最近的一个采样 | 30 Hz 状态、RGB 帧、一个音频 chunk |
+| `"interpolate"` | 在 `t` 处线性插值 | 中频位姿或轨迹 |
+| `(start, end)` | `(t + start, t + end]` 内的全部采样，以及 `"<key>_timestamps"` | 注视、肌电、脑电、高频 IMU |
+
+窗口是读取时的选择，存放在 `meta/info.json`，因此同一个仓库可以在不改写数据的前提下按不同时间分辨率消费。也可以在构造数据集时逐特征覆盖：
+
+```python
+ds = HumanCOINDataset(
+    repo_id="HumanCOIN/l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8",
+    root="data/HumanCOIN/l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8",
+    window_overrides={
+        "observation.eye_gaze": (-1 / 30, 0.0),
+        "observation.eeg_denoise": (-1 / 30, 0.0),
+        "observation.left_wrist_emg": (-1 / 30, 0.0),
+    },
+)
+
+item = ds[100]
+print(item["timestamp"])                          # tensor(3.3333)
+print(item["observation.eye_gaze"].shape)         # 约 [6, 2]
+print(item["observation.eeg_denoise"].shape)      # 约 [33, 132]
+print(item["observation.left_wrist_emg"].shape)   # 约 [66, 8]
+print(item["observation.images.head_rgb"].shape)  # [3, 360, 640]
+print(item["action"].shape)                       # [58]
+```
+
+> **循环前先确认键名。** 不同发布批次的特征名可能略有差异（例如卡片里的 `observation.left_wrist_emg` 与 Parquet 文件里的 `*_emg_raw` / `*_emg_denoise`）。以你下载的这份数据中 `ds.meta.features` 打印出的键为准。
+
+<p align="center">
+  <img src="assets/read-path.png" alt="读取路径：主索引、各流独立时钟、窗口、插值与最近邻查询" width="70%">
+  <br>
+  <sub>读取路径（论文 Fig. 6b）。固定频率的主索引给出第 <code>n</code> 帧；每一路按自己的时钟解析——脑电/肌电用窗口，注视用插值，RGB 用最近邻——写入时不重采样。图源：论文。</sub>
+</p>
+
+第一次访问某条 episode 时，每路 Parquet 会被加载并缓存；之后再读同一 episode 的其他帧就很快。视频帧按需解码。因此顺序读取远快于跨 episode 随机读取，`num_workers > 0` 会成倍增加内存，因为每个 worker 都有自己的缓存。
+
+### 索引列与任务标签
+
+`item` 还包含 `timestamp`、`frame_index`、`episode_index`、`index`、`task_index` 和 `task`。`index` 是仓库内的全局帧号；`task` 是当前帧对应的任务字符串。在 L3，`observation.state` 与 `action` 是 58 维融合向量：双腕位姿与头部位姿（18 维）加 40 个手指关节角。
+
+### 子集、偏移与 delta 时间戳
+
+```python
+# 只加载指定 episode
+ds = HumanCOINDataset(repo_id=..., root=..., episodes=[0, 2])
+
+# 把一个特征在查询帧前后若干偏移上堆叠起来
+ds = HumanCOINDataset(
+    repo_id=..., root=...,
+    delta_timestamps={"observation.head_pose": [-0.5, 0.0, 0.5]},
+)
+item = ds[100]
+print(item["observation.head_pose"].shape)   # [3, 7]
+```
+
+`delta_timestamps` 适合取短时上下文。当前实现会把同一组偏移应用到被堆叠的特征上，因此依赖逐特征对齐时请只传一组偏移。
+
+### 深度、音频与缺失值
+
+- **深度。** 当元数据标记了 `video.is_depth_map` 且形状为 `(H, W, 1)` 时，视角按原生采样格式解码为 `(1, H, W)`（例如 `gray12le` 对应 `uint16`），不做 RGB 转换，也不除以 255。部分发布把深度存成 `(H, W)`；读取前先确认 `info.json` 里的 `shape` 和 `video.is_depth_map`，不要默认当 RGB 处理。单位和无效值保持存储时的定义。
+- **音频。** 最近邻读取返回一个完整 chunk；`(start, end)` 窗口返回跨 chunk 边界的精确采样切片并拼接。chunk 以第一个采样为标签，采样间隔严格为 `1 / sample_rate`。
+- **缺失。** 手部跟踪丢失、注视无效、脑电坏导联会表现为 `NaN` 或空窗口，而不是伪造的值。高频窗口的长度可能相差一两个采样，因为时间戳没有吸附到网格。
+
+### 组 batch
+
+窗口特征是变长的，PyTorch 默认的 collate 会失败。可以在模型里补齐/裁剪，或使用列表 collate：
+
+```python
+from torch.utils.data import DataLoader
+
+def collate(batch):
+    return {key: [b[key] for b in batch] for key in batch[0]}
+
+loader = DataLoader(ds, batch_size=4, shuffle=True, collate_fn=collate, num_workers=0)
+```
+
+---
+
+## 可视化
+
+### 门户预览
+
+[数据门户](https://flagopen.github.io/HumanCOIN-DataManager/) 是下载前最快的查看方式：点开卡片可以看到任务描述、封面帧、传感器列表、episode 数、时长、大小和分辨率。完整视频预览从 Hugging Face 流式加载，受限仓库需要先获得权限。
+
+### 浏览器可视化器（真实数据推荐）
+
+```bash
+# DATASET_ROOT 是任务目录；扁平的 L2/L3 仓库直接用仓库根目录
+humancoin-visualize-web "<dataset-root>"
+# 需要时指定端口或监听地址
+humancoin-visualize-web "<dataset-root>" --port 8080 --no-browser
+```
+
+页面包含同步的相机面板、逐路信号条、可拖动的时间窗；数据里有对应流时还会显示 3D 位姿/手部骨架；发布中包含阻抗快照时，还会显示按质量分带的脑电电极网格。脑电/肌电条上可以做零相位 Butterworth 高通/低通，并在工频及其谐波上做梳状陷波；同样的滤波可以通过 API 传入，例如 `filt=observation.eeg_denoise:hp=0.5,lp=40,notch=50`。滤波是查看和分析的便利工具，不替代有记录的处理流程。
+
+<p align="center">
+  <img src="assets/visualizer.png" alt="HumanCOIN 浏览器可视化器运行在真实 L3 episode 上：完整相机墙、3D 位姿、肌电、IMU 与注视信号条" width="100%">
+  <br>
+  <sub>浏览器可视化器运行在真实 L3 episode（<code>l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8</code>，第 381/848 帧）：完整 raw/rectified 相机墙、3D 头/腕/手骨架，以及肌电、IMU 与注视信号条共用一条主时间轴。</sub>
+</p>
+
+### 桌面可视化器
+
+```bash
+humancoin-visualize "<dataset-root>" --episode 0
+```
+
+
+| 按键 | 作用 |
+|------|------|
+| `space` | 播放 / 暂停 |
+| `←` `→` | 上一帧 / 下一帧 |
+| `↑` `↓` | 加快 / 减慢播放 |
+| `w` `s` | 放宽 / 收窄时间窗 |
+| `q` / `Esc` | 退出 |
+
+---
+
+## 使用数据：默认帧与意图代理输入
+
+`ds[i]` 已经返回了逐帧 batch 所需的内容：默认的 observation、state 和 action，以及 `info.json` 中配置好的代理信号窗口。不需要先自己拼一个窗口数据集。
+
+| 键 | 典型形状 | 含义 |
+|----|----------|------|
+| `observation.images.head_rgb` | `(3, H, W)` | 相机帧 |
+| `observation.state` | `(58,)` | 头/腕位姿 + 40 个手指关节的融合状态 |
+| `action` | `(58,)` | 融合动作目标 |
+| `observation.eye_gaze` | `(N_g, 2)` | 像素坐标注视窗口 |
+| `observation.left_wrist_emg` | `(N_e, 8)` | 8 通道肌电窗口 |
+| `observation.eeg_denoise` | `(N_c, 132)` | 132 通道脑电窗口 |
+
+代理窗口是变长的，batch 时只需要 padding 和 mask，不需要重采样，也不需要手工拼时间维。先打印 `ds.meta.features`：有些发布把肌电放在 `*_raw` / `*_denoise` 等不同后缀下。
+
+### 组默认字段的 batch
+
+```python
+from pathlib import Path
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, Subset
+
+from humancoin import HumanCOINDataset
+
+REPO = "HumanCOIN/l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8"
+ds = HumanCOINDataset(
+    repo_id=REPO,
+    root=Path("data") / REPO,
+    tolerance_s=1 / 30,          # L3 视频可能比主时钟偏一帧
+)
+
+PROXY_KEYS = (
+    "observation.eye_gaze",
+    "observation.left_wrist_emg",
+    "observation.eeg_denoise",
+)
+
+
+def collate(batch):
+    out = {
+        "observation.images.head_rgb": torch.stack(
+            [b["observation.images.head_rgb"] for b in batch]),
+        "observation.state": torch.stack([b["observation.state"] for b in batch]),
+        "action": torch.stack([b["action"] for b in batch]),
+    }
+    for key in PROXY_KEYS:
+        seqs = [b[key] for b in batch]
+        length = max(len(seq) for seq in seqs)
+        dim = seqs[0].shape[-1]
+        padded = torch.zeros(len(seqs), length, dim)
+        mask = torch.zeros(len(seqs), length, dtype=torch.bool)
+        for i, seq in enumerate(seqs):
+            if len(seq):
+                padded[i, :len(seq)] = seq
+                mask[i, :len(seq)] = True
+        out[key] = padded
+        out[f"{key}_mask"] = mask
+    return out
+
+
+loader = DataLoader(
+    Subset(ds, range(1, len(ds))),   # 跳过第 0 帧，它的视频可能晚一个 tick
+    batch_size=8,
+    shuffle=True,
+    collate_fn=collate,
+)
+```
+
+### Demo：把 gaze / EMG / EEG 接入动作头
+
+这个模型刻意做小：一个图像编码器、一个线性 state 编码器、每路代理一个编码器、对每个窗口做 masked mean pooling，最后接动作头。它足以演示注视、肌电和脑电如何与 `o`、`a` 进入同一次前向。
+
+```python
+class ProxyPolicy(nn.Module):
+    def __init__(self, state_dim=58, action_dim=58, width=64):
+        super().__init__()
+        self.image = nn.Sequential(
+            nn.Conv2d(3, 16, 5, stride=2, padding=2), nn.ReLU(),
+            nn.Conv2d(16, 32, 3, stride=2, padding=1), nn.ReLU(),
+            nn.AdaptiveAvgPool2d(1), nn.Flatten(),
+            nn.Linear(32, width),
+        )
+        self.state = nn.Linear(state_dim, width)
+        self.gaze = nn.Linear(2, width)
+        self.emg = nn.Linear(8, width)
+        self.eeg = nn.Linear(132, width)
+        self.head = nn.Sequential(
+            nn.Linear(width * 5, width * 2), nn.GELU(),
+            nn.Linear(width * 2, action_dim),
+        )
+
+    @staticmethod
+    def masked_mean(x, mask):
+        x = x * mask.unsqueeze(-1)
+        return x.sum(1) / mask.sum(1, keepdim=True).clamp_min(1)
+
+    def forward(self, batch):
+        image = F.interpolate(
+            batch["observation.images.head_rgb"],
+            size=(128, 128), mode="bilinear", align_corners=False,
+        )
+        z_img = self.image(image)
+        z_state = self.state(batch["observation.state"])
+        z_gaze = self.masked_mean(
+            self.gaze(batch["observation.eye_gaze"]),
+            batch["observation.eye_gaze_mask"],
+        )
+        z_emg = self.masked_mean(
+            self.emg(batch["observation.left_wrist_emg"]),
+            batch["observation.left_wrist_emg_mask"],
+        )
+        z_eeg = self.masked_mean(
+            self.eeg(batch["observation.eeg_denoise"]),
+            batch["observation.eeg_denoise_mask"],
+        )
+        return self.head(torch.cat([z_img, z_state, z_gaze, z_emg, z_eeg], dim=-1))
+
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = ProxyPolicy().to(device)
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+
+for step, batch in enumerate(loader):
+    batch = {key: value.to(device) for key, value in batch.items()}
+    pred = model(batch)
+    loss = F.mse_loss(pred, batch["action"])
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    print(f"step {step}: loss={loss.item():.4f}")
+    if step == 0:               # 跑一步就能检查接线是否正确
+        break
+```
+
+在真实 L3 episode 上，这段代码可以跑出一步有限 loss；这只说明形状和梯度接通了。
+
+### 接到 LeRobot Diffusion Policy
+
+LeRobot 的 `DiffusionPolicy` 消费 `observation.images.*`、`observation.state` 和 `action`，并用图像与 state 编码器构造 global conditioning。原版 `DiffusionConfig` 没有 gaze/emg/eeg 的一等输入。要把代理信号接进去，最小的改动是把三路代理 embedding 融合成一个向量，然后二选一：
+
+- 拼到 `observation.state` 上，同时加宽策略的 state 特征维度；
+- 在 `DiffusionModel._prepare_global_conditioning` 中作为额外的 global-conditioning token 注入。
+
+`lerobot-train` 还要求一个合并成单表、带数据集统计量的 `LeRobotDataset`；HumanCOIN 的逐流布局不是那个格式。因此生产流水线需要一个小适配器，或先把固定频率视图物化。上面的 demo 刻意不假装 `DiffusionPolicy` 可以原样跑通。
+
+### 为什么不能直接使用
+
+- **动作空间是人体，不是机器人。** `action` 是 58 维融合位姿与手指向量；机器人需要重定向、隐动作空间或不同的输出头。
+- **一条 episode 不构成数据集。** 这里是 28 秒录制上的接线测试，不是训练好的策略。
+- **没有归一化和评测。** 动作与代理信号按原始尺度使用；真实训练需要统计量、训练/验证切分和任务指标。
+- **代理键名会变。** 发布可能使用 `*_raw` / `*_denoise` 或 `left_wrist_emg` / `.denoised`；务必先读 `ds.meta.features`，替换成实际键名。
+- **窗口默认很短。** 33 ms 的注视/肌电/脑电窗口只是默认查询，不一定适合作为意图的时间上下文；窗口长度是建模选择。
+
+### 这份语料适合做什么
+
+更有价值的用法在上一层：在 12,500 小时上预训练多模态表征、学习代理模型 `p(m | o)`、训练以意图为条件的架构 `p(a | o, m)`、在只有视频时估计注视/手部位姿，以及检验意图能否跨层迁移。**生产级训练配方不是本项目的重点**；重点是语料与读取工具。如果你在其上做出更强的基线、转换脚本或新架构，欢迎向社区贡献代码和 issue。
+
+---
+
+## 数据是怎么采集的
+
+<p align="center">
+  <img src="assets/tier-kits.jpg" alt="按层级划分的采集设备：头环、肌电臂环、脑电帽、腕部相机、眼动仪、手套与 tracker" width="100%">
+  <br>
+  <sub>三套设备。L1：第三方头环。L2：固定四目头环 + 双侧肌电臂环。L3：在 L2 基础上加脑电、腕部相机，受控环境下再加眼动仪、手套与 6-DoF tracker。图源：论文。</sub>
+</p>
+
+### 硬件配置
+
+| 层级 | 数据流 | 设备（示例） | 原生分辨率 / 通道 | 频率 | 单位 |
+|------|--------|--------------|-------------------|------|------|
+| L1 | 头部 RGB | 第三方头环：14 款、13 家厂商、2–6 目 | 512×512–3840×1200 | 20–60 fps | RGB |
+| L2 | 头部 RGB | 四目头环，前向立体对硬件同步 | 1920×1200 | 30 fps | RGB |
+| L2/L3 | 腕部 RGB | JIERUIWEITONG FH868 | 640×480（部分 L2 发布为 1920×1080） | 30 fps | RGB |
+| L3 | 眼动场景相机 | Pupil Labs Neon | 1600×1200 | 30 fps | RGB |
+| L3 | 第三人称 | Intel RealSense D455f | 640×480 | 30 fps | RGB-D |
+| L3 | 注视 | Pupil Labs Neon | 场景相机中的 x, y 像素 | 200 Hz | px |
+| L3 | 头/腕位姿 | HTC VIVE Tracker 3.0 ×3 | 同一坐标系下的 6-DoF | 设备约 800 Hz | mm / deg |
+| L3 | 手指运动学 | MANUS Metaglove Pro Haptics | 每手 20 个关节 | 设备约 800 Hz | deg |
+| L2/L3 | 表面肌电 | WLEMGUV2A 臂环 ×2 | 每臂 8 通道 | 2 kHz | mV |
+| L3 | 脑电（受控） | Compumedics Neuroscan SynAmps2 | 128 通道 | 1 kHz | µV |
+| L3 | 脑电（开放） | BrainCo BCIGo | 32 或 8 通道 | 250 Hz | µV |
+| L1–L3 | 音频 | 头环麦克风 | 单声道 | 16 kHz | PCM |
+
+表中是原生采集配置；发布流可能被降采样，实际形状以 `meta/info.json` 为准。L1 的注视、深度、位姿和手部都从视频推断；L3 在受控环境中用 tracker 与手套直接测量位姿。设备之间不做菊花链：单一主机接收所有数据流并记录到达偏移，因此每台设备保留自己的时钟和原生频率。并口盒还会把阶段与 run 切换写入脑电放大器，使协议事件同时存在于放大器时钟和主机时钟上。
+
+### 开放与受控、想象与执行
+
+L1 和 L2 在**开放环境**采集：可穿戴设备、头环计算机，操作者可以在日常场景中自由走动。L2 和 L3 用任务单把物体摆放和步骤顺序固定下来，使同一任务在不同 session 中一致。L3 还有**受控环境**：固定桌面、稳定光照、有时限的 session，以满足高密度脑电、眼动和动捕对静止姿态的要求。
+
+受控 session 分两段。**运动想象（imagery）**时屏幕变蓝，操作者坐直不动，在脑中预演任务序列，只记录脑电和注视；**执行（execution）**时屏幕变绿，同一任务被真正执行，所有模态同时记录。`run start`、`imagine`、`execute`、`run end` 等阶段标记写入记录，因此两段可以从任意数据流上按同一时间基切出来。
+
+### 从原始信号到发布表
+
+每路信号先由理解其物理特性的处理链清洗，最后才对齐：
+
+| 阶段 | 做什么 | 发布什么 |
+|------|--------|----------|
+| 同步与标定 | 样本相对 episode 起点打时间戳，主机记录到达偏移；相机、tracker 与眼动仪按 session 标定。 | 每路时间戳、内参、畸变、校正参数与 tracker 变换。 |
+| 几何与运动 | 深度由同步后的前向立体对经 FoundationStereo 得到，再逐帧投影成点云；手部在重叠视频窗口上重建并锚定到深度图。 | 深度图、点云、头/腕/胸位姿与手指运动学；受控 L3 用 tracker 与手套测量替代估计。 |
+| 注视 | 受控 L3 由眼动仪以 200 Hz 实测；其余情况由视频模型以 30 Hz 预测。 | `eye_gaze` 与 `eye_gaze_predict` 使用不同名称。 |
+| 肌电 | 零相位 20–450 Hz 带通与 50 Hz 梳状陷波，保留原始与去噪轨迹。 | `*_emg_raw` / `*_emg_denoise`（命名随发布变化），2 kHz。 |
+| 脑电 | 去均值、0.5–100 Hz 带通、50 Hz 陷波、坏导联检测、ICA 去除眼电与肌电成分、球面样条插值、平均参考。 | 原始与清洗后的脑电表；残余运动噪声被记录而不是隐藏。 |
+| 标注与质检 | Argus + Qwen 生成步骤标注，人工审核每次导出；每条 session 写完后逐流检查。 | 结构化标注 JSON、`qc_reports.jsonl`；失败的 session 重采，而不是打补丁。 |
+
+### 隐私与知情同意
+
+所有参与者在录制前签署书面知情同意，并可随时退出。发布的 episode 已去标识化：所有视角中的人脸都做了模糊处理，三个层级使用同一套同意与去标识化协议。数据以 CC BY-NC 4.0 许可发布，仅限研究与非商业用途；代码使用 Apache-2.0。
+
+---
+
+## 与其他数据集对比
+
+HumanCOIN 的重点不只是规模，而是「场景覆盖」与「意图通路的三种测量深度」被放在同一套任务和同一条时钟上。
+
+| 数据集 | 小时数 | 相机 | 深度 / 3D | 注视 | 表面肌电 | 脑电 | 手指运动学 |
+|--------|--------|------|-----------|------|----------|------|------------|
+| Ego4D | 3,670 | 1 路头部 | 子集 | 子集 | – | – | 子集 |
+| Ego-Exo4D | 1,286 | 头部 + 4–5 路第三人称 | 重建 | ✓ | – | – | ✓ |
+| EgoDEX | 829 | 1 路头部 | – | – | – | – | ✓ |
+| EgoBrain | 61 | 1 路头部 | – | – | – | ✓ | – |
+| Xperience-10M | 10,000 | 6 路头部 | 重建 | – | – | – | ✓ |
+| **HumanCOIN** | **12,500** | **2–6 路头部、2 路腕部\*、第三人称\*** | **重建** | **✓ / P** | **✓** | **✓\*** | **✓ / P** |
+
+`✓` 实测，`P` 从视频预测/估计，`–` 未提供，`*` 仅覆盖语料子集。HumanCOIN 的深度与 3D 除受控套件直接测位姿外，均由立体视频重建。此表是代表性对比，不是完整普查；完整讨论见论文。
+
+---
+
+## 录制自己的多频流
+
+同一个包也可以按 HumanCOIN 的格式写入多频率数据。只使用已发布数据的话可以跳过这一节。
 
 ```python
 import numpy as np
 from humancoin import HumanCOINDataset
 
 ds = HumanCOINDataset.create(
-    repo_id="my_dataset", root="data/", fps=30,
+    repo_id="my_multirate_dataset",
+    root="data/my_multirate_dataset",
+    fps=30,
     features={
-        # 相机：dtype="video" 自动编码为 MP4
         "observation.images.cam": {
             "dtype": "video", "shape": (480, 640, 3),
             "names": ["h", "w", "c"], "fps": 30,
         },
-        # 高频 IMU：window 定义"返回 (t-33ms, t] 的所有读数"
         "observation.imu": {
             "dtype": "float32", "shape": (6,),
             "names": ["ax", "ay", "az", "gx", "gy", "gz"],
-            "fps": 1000,
-            "window": (-0.033, 0.0),
-            "tolerance_s": 0.002,
+            "fps": 1000, "window": (-1 / 30, 0.0),
         },
-        # 中频 EEG
-        "observation.eeg": {
-            "dtype": "float32", "shape": (8,),
-            "names": ["Fz", "Cz", "Pz", "Oz", "F3", "F4", "C3", "C4"],
-            "fps": 256,
-            "window": (-0.033, 0.0),
-        },
-        # 末端位姿：无 window，默认最近邻
         "observation.state": {
             "dtype": "float32", "shape": (7,),
-            "names": ["x", "y", "z", "roll", "pitch", "yaw", "gripper"],
+            "names": ["x", "y", "z", "roll", "pitch", "yaw", "grip"],
             "fps": 30,
         },
         "action": {
@@ -245,592 +841,62 @@ ds = HumanCOINDataset.create(
     },
 )
 
-# 记录：task = 主时钟，每帧以 task 调用为界
-for i in range(300):
-    # 高频传感器：每帧读写多次
-    for _ in range(33):   # 1000Hz / 30fps ≈ 33
+# imu_sample、state、action、image 是你自己的数组/张量
+for _ in range(300):
+    for _ in range(33):                       # 1000 Hz / 30 fps
         ds.add_frame("observation.imu", imu_sample)
-    for _ in range(8):    # 256Hz / 30fps ≈ 8
-        ds.add_frame("observation.eeg", eeg_sample)
+    ds.add_frame("task", "reach_target")      # task 调用即帧边界，也是主时钟
+    ds.add_frame("observation.state", state)
+    ds.add_frame("action", action)
+    ds.add_frame("observation.images.cam", image)
 
-    # task 调用 = 帧边界，自动生成时间戳
-    ds.add_frame("task", "reach_target")
-
-    # 相机帧率传感器：每帧读写一次
-    ds.add_frame("observation.state", joint_state)
-    ds.add_frame("action", action_cmd)
-    ds.add_frame("observation.images.cam", camera_image)
-
-ds.save_episode()
+ds.save_episode()                             # 落盘、写元数据、检查对齐
 ```
 
-**读取** — window feature 返回窗口内全部读数，nearest feature 返回最近邻单值：
-
-```python
-ds = HumanCOINDataset(repo_id="my_dataset", root="data/")
-item = ds[10]
-
-item["observation.imu"]             # tensor([33, 6]) — (-0.033, 0] 内 33 个读数
-item["observation.imu_timestamps"]  # tensor([33])
-item["observation.eeg"]             # tensor([8, 8])
-item["observation.state"]           # tensor([7]) — 最近邻
-item["observation.images.cam"]      # tensor([3, 480, 640]) — CHW
-item["task"]                        # "reach_target"
-```
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant DS as Dataset
-    participant PF as ParquetFeature<br/>(imu)
-    participant VF as VideoFeature<br/>(cam)
-    participant IX as MasterIndex
-
-    loop 每帧
-        User->>DS: add_frame("imu", data)
-        DS->>DS: _auto_timestamp("imu")<br/>ts = counter × 1/1000
-        DS->>PF: add(data, ts)
-        Note over PF: buffer.append((ts, data))
-
-        User->>DS: add_frame("task", "reach")
-        DS->>DS: ts = len(index) / fps
-        DS->>IX: record_frame(ts, "reach")
-
-        User->>DS: add_frame("cam", image)
-        DS->>DS: _auto_timestamp("cam")<br/>ts = counter × 1/30
-        DS->>VF: add(image, ts)
-        Note over VF: 保存 PNG + 记录时间戳
-    end
-
-    User->>DS: save_episode()
-    DS->>IX: write(ep_idx) → master_index.parquet
-    DS->>PF: save() → imu.parquet
-    DS->>VF: save() → timestamp parquet + MP4
-    DS->>DS: meta.save_episode()
-    DS->>DS: _check_episode_alignment()
-```
-
-## 4. Demo 与可视化
-
-### 4.1 运行 Demo
-
-```bash
-# 写入 3 个 episode 的模拟数据
-python -m examples.01write_simple
-
-# 读取并检查数据
-python -m examples.01read_simple
-
-# 交互式可视化
-humancoin-visualize data/demo --episode 0
-
-# 网页可视化（浏览器界面，可拖动时间窗口）
-humancoin-visualize-web /path/to/dataset
-
-# 音频：麦克风以 WAV + 时间戳 parquet 存储
-python -m examples.06audio_example
-```
-
-网页可视化支持对 EEG/EMG 条带做零相位滤波：在条带上打开"滤波"面板，可组合高通/低通 Butterworth 滤波与工频及其全部谐波的梳状陷波（内置 EEG/EMG 预设）。API 同样支持按 feature 传参：`/api/frame?...&filt=observation.eeg:hp=0.5,lp=40,notch=50`。
-
-还内置 3D 姿态视图（SteamVR 右手系、Y 朝上：`*_pose` 6D 位姿画为坐标三角轴 + 近期运动拖尾（随时间渐亮）、`hand_skeleton` 正运动学得到指尖末端轨迹，可拖动旋转/滚轮缩放），以及静态快照字段的电极着色网格（如 `eeg_impedance` 按阻抗质量分档着色）。位姿旋转严格按采集端公式还原（`R = Rz(yaw)·Ry(pitch)·Rx(roll)`，即采集端对 OpenVR 矩阵做 ZYX 欧拉分解的逆）；手骨架经每手恒定的 Manus→tracker 安装映射挂接（tracker 约定 +z=手指、+y=手背，并沿 −y 偏移 5cm——tracker 实际安装在手背上方）。
-
-### 4.2 Demo 1：写入（01write_simple.py）
-
-主写 demo：一组模拟的多传感器数据流 —— 3 路相机 + IMU + EEG + EMG + temperature，录制三个 2 秒 episode（`reach_target`、`pour_liquid`、`stack_blocks`）：
-
-| 传感器 | 维度 | 频率 | Window |
-|--------|------|------|--------|
-| head_rgb | 480×640×3 | 30 fps | — (video) |
-| left_wrist_rgb | 480×640×3 | 30 fps | — (video) |
-| right_wrist_rgb | 480×640×3 | 30 fps | — (video) |
-| imu | 6 (accel+gyro) | 1000 Hz | (-0.033, 0.0) |
-| eeg | 8 (脑电通道) | 256 Hz | (-0.033, 0.0) |
-| emg_left | 4 (肌肉通道) | 100 Hz | (-0.033, 0.0) |
-| emg_right | 4 (肌肉通道) | 100 Hz | (-0.033, 0.0) |
-| temperature | 1 | 10 Hz | — (nearest) |
-| state | 7 (x,y,z,r,p,y,grip) | 30 Hz | — (nearest) |
-| action | 7 (速度指令) | 30 Hz | — (nearest) |
-
-它演示了：
-
-- `dtype: "video"` 的 feature 自动编码为 MP4，每个主帧恰好一帧视频
-- 高频传感器在两次 task 调用之间写入多次；每个 feature 的时间戳自动生成：`timestamp_start + counter × 1/fps`
-- 每次 `save_episode()` 写入 `master_index.parquet` + 各 feature 的 parquet + 视频，然后运行对齐校验（所有 feature 都应显示 OK）
-
-```bash
-python -m examples.01write_simple
-```
-
-### 4.3 Demo 2：读取（01read_simple.py）
-
-读取 Demo 1 写出的数据集，端到端地演示每条读取路径：
-
-- window feature（`observation.imu`）返回窗口内全部读数及其时间戳
-- nearest feature（`observation.temperature`、`observation.state`、`action`）返回单个向量
-- 视频解码回 CHW 张量
-- `window_overrides` 在读取时加宽 IMU 窗口，不改动已存储的数据
-- 打印各帧 IMU 段大小 —— 前几帧为空，因为 IMU 从 `timestamp_start: 0.1` 才开始有数据
-
-```bash
-python -m examples.01read_simple   # 依赖 01write_simple 的数据
-```
-
-### 4.4 Demo 3：对齐容差（02tolerance_example.py）
-
-演示对齐校验如何捕获违反对齐约定的传感器：IMU 配置了 `timestamp_start: 0.1`（迟到 100 ms 上线）和严格的 `tolerance_s: 0.002`，其采样离前几个主帧过远。`save_episode()` 后，校验器把违规帧写入 `meta/alignment_check.jsonl`，demo 再打印这份报告。
-
-经验法则：`tolerance_s` 必须覆盖主帧到传感器最近采样的距离 —— 最多半个周期（例如 10 Hz 传感器 ≤ 50 ms）—— 再加上启动偏移与抖动。
-
-```bash
-python -m examples.02tolerance_example
-```
-
-### 4.5 Demo 4：Window 模式（03window_example.py）
-
-一个 episode，三种聚合模式并列对比：
-
-- `observation.imu` 1000 Hz，`window: (-0.033, 0.0)` —— 区间查询，每帧约 33 条读数
-- `observation.finger_pose` 120 Hz，`window: "interpolate"` —— 在帧时间戳处插值
-- `observation.temperature` 10 Hz，无 window —— 最近邻
-
-随后用 `window_overrides` 重新打开数据集 —— IMU 窗口加宽、finger pose 改为区间查询 —— 证明 window 是读取时的决定，而不是存储数据的固有属性。
-
-```bash
-python -m examples.03window_example
-```
-
-### 4.6 Demo 5：Delta 时间戳（04delta_example.py）
-
-`delta_timestamps={"observation.state": [-0.1, 0.0, 0.1]}` 多帧时序查询：读取 `ds[i]` 时 state 返回三个时间点（t-0.1、t、t+0.1）的堆叠结果，而不是单个向量 —— 这是 delta 位姿训练与时序增广的基础。
-
-```bash
-python -m examples.04delta_example
-```
-
-### 4.7 Demo 6：异步传感器启动（05async_startup_example.py）
-
-真实传感器不会在同一瞬间上线：进程启动后，每个传感器以自己的墙钟时间返回首帧（IMU 在 0.04 s，EMG 在 0.12 s，脑电放大器在 0.31 s，…）。本 demo 模拟这样的数据流，并在添加数据**之前**与主时钟对齐：
-
-1. **t_all_started** —— 所有传感器都已返回首帧的墙钟时刻（各首帧时间的最大值）。
-2. **t = 0** —— 主时钟参考传感器在 `t_all_started` 之后（含）的第一帧；此前的帧全部丢弃。
-3. **timestamp_start** —— 其余每个传感器在 t = 0 之后的下一帧与该帧的差值，写入 feature 定义，使存储的时间戳与主时钟保持相位对齐。
-4. **添加数据** —— 从 t = 0 开始记录。episode 在主时钟停止时结束，但每个传感器继续产生数据直到**主时钟最后一帧之后的下一帧**——这个尾部样本保证最后一帧的 window 依然有数据。
-
-模拟的启动延迟：
-
-| 传感器 | 频率 | 首帧（墙钟） |
-|--------|------|--------------------------|
-| `observation.imu` | 1000 Hz | 0.04 s |
-| `observation.emg` | 100 Hz | 0.12 s |
-| `observation.state`（主时钟参考） | 30 Hz | 0.18 s |
-| `observation.temperature` | 10 Hz | 0.22 s |
-| `action` | 30 Hz | 0.24 s |
-| `observation.eeg` | 256 Hz | 0.31 s |
-
-demo 算出 `t_all_started = 0.31 s`，取主时钟的下一帧作为 t = 0，推导每个传感器的 `timestamp_start`，写入数据集，并在磁盘上校验：每个 feature 的首条存储时间戳等于其 `timestamp_start`、末条采样落在主时钟停止之后；随后读回第 0 帧、中间帧与最后一帧。
-
-两个值得注意的推论：
-
-- **第 0 帧的向后 window 为空。** 每个传感器的首条存储帧都落在各自的 `timestamp_start` > 0 处，更早的数据按设计被丢弃，因此 `(-0.033, 0.0)` 这类 window 在开头几帧没有数据可返回。
-- **容差必须覆盖传感器半个周期。** 对齐校验对比的是每个主帧与传感器*最近*采样的距离，最坏为半个周期（10 Hz 传感器最远可差 50 ms）再加抖动——例如这里 10 Hz 的 temperature 设为 `tolerance_s: 0.06`。
-
-```bash
-python -m examples.05async_startup_example
-```
-
-### 4.8 Demo 7：音频（06audio_example.py）
-
-一路相机 + state + 一个模拟麦克风，端到端演示音频存储路径：
-
-- `dtype: "audio"` 的 feature，`shape` 定义单个音频块的形状 `(n_samples,)`（单声道）或 `(n_samples, channels)`（多声道），且必须提供 `sample_rate`
-- 每个主帧一次 `add_frame` 存一个音频块；`save_episode()` 把所有块按时间顺序拼接为一个 PCM16 WAV 存到 `audios/`，同时在其余 per-feature parquet 旁写一个时间戳索引（`timestamp | episode_index | num_samples`）
-- 读取 `ds[i]`：最近邻模式经 parquet 索引解析出距主时钟时间戳最近的块并整块返回——原子单元，类比视频一帧；设置 `window`（spec、`window_overrides` 或直接 `read(..., window=(start, end))`）则返回时间落在 `(t + start, t + end]` 的所有采样，跨块按采样精度截取后拼接
-- 对齐校验器同时报告 WAV 完整性：块数 vs 索引行数、采样数 vs 索引总和
-
-```bash
-python -m examples.06audio_example
-```
-
-### 4.9 可视化操作
-
-**可视化效果**（`humancoin-visualize data/demo --episode 0`）：
-
-![可视化效果截图](examples/visualize.png)
-
-```
-space    — 播放/暂停
-← →      — 逐帧前进/后退
-↑ ↓      — 加速/减速播放
-w s      — 扩大/缩小窗口
-q / Esc  — 退出
-```
-
-
-## 5. 核心概念
-
-### 5.1 每特征独立存储
-
-存储布局：
-
-```
-data/
-└── chunk-000/
-    └── episode_000000/
-        ├── master_index.parquet                # timestamp | frame_index | task_index
-        ├── observation.imu.parquet             # 1000Hz · 1980 行 · 6 列
-        ├── observation.eeg.parquet             # 256Hz · 512 行 · 8 列
-        ├── observation.state.parquet           # 30Hz · 60 行 · 7 列
-        └── observation.images.head_rgb.parquet # 30Hz · 60 行 · 仅时间戳
-
-videos/
-└── chunk-000/
-    └── observation.images.head_rgb/
-        └── episode_000000.mp4
-
-audios/
-└── chunk-000/
-    └── observation.audio.mic/
-        └── episode_000000.wav
-```
-
-每个非视频 feature 一个 parquet，列格式统一：
-
-```
-timestamp (float64) | episode_index (int64) | col_0 (float32) | ... | col_D (float32)
-```
-
-- 相机帧率特征（state, action）：每帧一行，行数 = 帧数
-- 高频特征（imu, eeg）：帧间多次采样，行数 = 频率 × 时长
-- 相机特征：timestamp parquet + MP4 视频
-- 音频特征：timestamp parquet（`timestamp | episode_index | num_samples`，每次 `add_frame` 一行）+ 每 episode 一个 WAV，块按时间顺序拼接
-
-### 5.2 Task 即主时钟
-
-整个数据集以 **task 调用为帧边界**组织：`add_frame("task", ...)` 声明"当前帧到此结束，下一帧开始"。
-
-- **帧** = 两次 task 调用之间写入的所有 feature 数据。`add_frame("task", ...)` 时自动生成帧时间戳：`t = frame_index / fps`（也可用 `timestamp=` 手动传入覆盖）
-- **主时钟** = 帧序列。读取 `ds[i]` 时先查 `master_index` 得到第 i 帧的时间戳 t，所有 feature 再围绕 t 对齐（window / 最近邻，见 5.3）
-- **各 feature 的时间戳独立生成**，与主时钟无关：每个 feature 一个计数器，`add_frame` 时 `ts = timestamp_start + counter × (1 / fps)`；计数器在 `save_episode()` 后归零
-
-```python
-# 每帧的标准调用顺序：高频先写 → task 定边界 → 低频收尾
-ds.add_frame("observation.imu", ...)   # 高频传感器，帧间多次写入
-ds.add_frame("observation.eeg", ...)
-ds.add_frame("task", "pick_up")        # ← 帧边界：frame_index++，落主时钟时间戳
-ds.add_frame("observation.state", ...) # 相机帧率传感器，每帧一次
-ds.add_frame("observation.images.cam", image)
-```
-
-### 5.3 Window 参数
-
-主时钟的帧时间戳是查询基准，但 feature 的读数时刻并不一定落在帧上——`window` 定义"如何围绕帧时间戳聚合该 feature 的读数"：
-
-| `window` 值 | 行为 | 适用场景 |
-|------------|------|---------|
-| `None`（默认） | 最近邻：返回时间最接近的单个读数 | 相机帧率传感器 (state, action)；音频：返回一整块 |
-| `"interpolate"` | 线性插值：在查询时间点插值 | 中等频率传感器 (finger pose) |
-| `(start_s, end_s)` | 区间查询：返回 `(t+start, t+end]` 所有读数 | 高频传感器 (IMU, EEG, EMG)；音频：采样级截取 + 拼接 |
-
-```python
-# IMU at 1000Hz, 30fps master → ~33 readings per frame
-"window": (-0.033, 0.0)   # (t-33ms, t]
-
-# Wider window for context
-"window": (-0.066, 0.0)   # (t-66ms, t], ~66 readings
-
-# 读取时动态覆盖
-ds = HumanCOINDataset(
-    repo_id="my_dataset", root="data/",
-    window_overrides={"observation.imu": (-0.100, 0.0)},
-)
-```
-
-**查询 t = 0.333s（第 10 帧）时各 feature 的取数：**
-
-![查询 t = 0.333s（第 10 帧）时各 feature 的取数](assets/window_query.png)
-
-注意 temperature（10Hz）在 0.333 处没有采样点——采样网格是 0.3、0.4、…，最近邻自动回退到 t=0.300 的读数。
-
-
-## 6. API 参考
-
-### 创建数据集
-
-```python
-ds = HumanCOINDataset.create(
-    repo_id="my_dataset",
-    fps=30,
-    features={...},          # 见下文 Feature 定义格式
-)
-```
-
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `repo_id` | `str` | — | 数据集名称，`root` 下的存储目录名 |
-| `fps` | `float` | — | 主时钟帧率，帧时间戳 = `frame_index / fps` |
-| `features` | `dict[str, dict]` | — | 特征定义，格式见下文 |
-| `root` | `str \| Path` | `~/.cache/huggingface/lerobot/<repo_id>` | 存储根目录 |
-| `robot_type` | `str` | `None` | 机器人类型，仅写入元数据 |
-| `use_videos` | `bool` | `True` | `dtype="video"` 的特征是否编码为 MP4 |
-| `image_writer_processes` | `int` | `0` | 图像写入子进程数（0 = 主进程内写入） |
-| `image_writer_threads` | `int` | `0` | 图像写入线程数 |
-| `video_backend` | `str` | `None` | 视频后端（如 `"pyav"`），`None` 自动选择 |
-| `batch_encoding_size` | `int` | `1` | 每 N 个 episode 批量编码一次视频 |
-| `window_overrides` | `dict` | `None` | 覆盖各 feature 的 window（格式同读取时） |
-
-### Feature 定义格式
-
-```python
-features = {
-    "feature_key": {
-        "dtype": "video" | "audio" | "float32" | "int64",  # 必填
-        "shape": (H, W, C) | (N,) | (D,),         # 必填
-        "names": ["col_0", ...],                  # 必填
-        # 可选：
-        "fps": 1000,              # 此 feature 的采样率
-        "window": (-0.033, 0.0),  # 查询窗口
-        "timestamp_start": 0.1,   # 时间戳起始偏移
-        "tolerance_s": 0.002,     # 对齐容差
-        "sample_rate": 16000,     # 仅 audio：WAV 采样率
-    }
+每次 `add_frame("task", ...)` 关闭一个主帧；高频特征在两次 task 调用之间写入多次，并保留自己的时间戳。`info.json` 里记录的窗口会应用到之后的所有读取。可运行的示例在 `examples/`：`01write_simple.py`、`03window_example.py`、`04delta_example.py`、`06audio_example.py`，在源码目录下用 `python -m examples.<name>` 运行。
+
+---
+
+## 引用与许可
+
+如果使用 HumanCOIN，请引用：
+
+```bibtex
+@article{wu2026humancoin,
+  title   = {HumanCOIN: A 12,500-Hour Dataset for Human Intent in Egocentric Manipulation},
+  author  = {Wu, Shihan and Liu, You and He, Chunyu and Qin, Minghui and Jiao, Longhan and
+             Guo, Jinbang and Xie, Shaoxuan and Tian, Kaixi and Chen, Wenjie and Pang, Jingrui and
+             Zhang, Yuanhang and Zhang, Yichi and Liu, Miao and Pan, Tengfei and Jiao, Yance and
+             Zhang, Yunyan and Li, Yihang and Shen, Yongjian and Liu, Li and Zhu, Kai and
+             Fang, Chen and Chen, Jianxing and Liu, Sihan and Wang, Xiaofeng and Zhao, Jie and
+             Li, Jing and Wang, Yueqi and Tang, Yichen and Li, Wei and Yang, Zhexuan and Cao, Yue and
+             Zhao, Ji and Wang, Kai and Jiang, Dongsheng and Wang, Yongwei and Mu, Wei and
+             Pang, Jiangmiao and Yao, Maoqing and Ding, Wenchao and Zhu, Zheng and Xia, Zhongpu and
+             Du, Dalong and Niu, Jianwei and Gao, Dahui and Yu, Zhiwei and Lei, Bo and Yang, Huan and
+             Lin, Yonghua and Huang, Tiejun and Wang, Zhongyuan and Yao, Guocai},
+  journal = {arXiv preprint arXiv:2611.26434},
+  year    = {2026}
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `dtype` | `str` | ✓ | 存储类型：`"float32"`（连续量）、`"int64"`（离散量/id）、`"video"`（相机帧）、`"audio"`（麦克风音频块） |
-| `shape` | `tuple` | ✓ | 单个读数的形状：数值 feature 为 `(D,)`，视频为 `(H, W, C)`，音频为 `(n_samples,)` 或 `(n_samples, channels)` |
-| `names` | `list[str]` | ✓ | 每个维度的列名（作为 parquet 列名） |
-| `fps` | `float` | 可选 | 该 feature 的采样率，自动生成时间戳 `timestamp_start + counter × 1/fps`；不填回退到主时钟 `fps` |
-| `window` | `None \| "interpolate" \| (start, end)` | `None` | 查询时如何聚合读数（见 5.3） |
-| `timestamp_start` | `float` | `0.0` | 时间戳起始偏移，如传感器在 t=0.1s 才开始记录 |
-| `tolerance_s` | `float` | `None` | 对齐容差：`save_episode()` 后检查每帧最近读数的偏差，超差记录到 `meta/alignment_check.jsonl` |
-| `sample_rate` | `int` | 仅 audio | WAV 文件的采样率（如 16000）；`dtype="audio"` 必填 |
+- **数据：** CC BY-NC 4.0，仅限研究与非商业用途；以每个数据集卡片上的许可为准。
+- **代码：** Apache-2.0。
+- **论文：** [arXiv:2611.26434](https://arxiv.org/abs/2611.26434)。
+- **项目主页：** [flagopen.github.io/HumanCOIN](https://flagopen.github.io/HumanCOIN/)。
+- **下载与预览：** [HumanCOIN 数据门户](https://flagopen.github.io/HumanCOIN-DataManager/)。
 
-约定与提示：
+---
 
-- feature key 遵循 LeRobot 命名约定，**不可包含 `/`**（如 `observation.imu`、`action`）
-- `dtype="video"` 的特征只存时间戳 parquet，图像编码为 MP4 存在 `videos/` 下
-- `dtype="audio"` 的特征每 episode 存一个 WAV 到 `audios/`，外加时间戳 parquet；每次 `add_frame` 传入一个 [-1, 1] 的 float32 采样块（`(n_samples,)` 单声道或 `(n_samples, channels)` 多声道）。最近邻读取返回一整块；`window` `(start, end)` 读取返回 `(t+start, t+end]` 内的采样拼接（时间契约：块首采样 = 标签时刻，块内严格 1/sample_rate，真实丢块只会让返回段变短、绝不拉伸内容）
-- 高频 feature 务必同时给 `fps` + `window`——否则查询按最近邻只返回 1 个读数，高频信息会丢失
+## 致谢
 
-### 写入
+HumanCOIN 由 BAAI AhaData Group 与多家合作单位共同完成，完整作者与单位列表见论文。数据格式构建在 [LeRobot](https://github.com/huggingface/lerobot) 之上；存储使用 [PyArrow](https://arrow.apache.org/docs/python/)，视频使用 [PyAV](https://pyav.org/)，深度、注视、手部重建与标注分别基于 FoundationStereo、EgoM2P、ACE-Ego-Hand、Argus 与 Qwen。感谢参与采集、标注和审核的所有人，以及为读取器和可视化器报告问题的社区用户。封面、意图通路、数据一览、episode 解剖、场景、读取路径与采集设备图引用自 HumanCOIN 报告；可视化器截图来自已发布的 L3 episode。
 
-```python
-ds.add_frame(key: str, value: np.ndarray | torch.Tensor | str,
-             timestamp: float | None = None)
-ds.save_episode()
-```
+---
 
-- `key`：`"task"` 或已定义的 feature key
-- `value`：数值 feature 为 `np.ndarray` / `torch.Tensor`（形状须匹配 `shape`）；视频 feature 为 `np.ndarray` (H, W, C)；task 为 `str` 任务标签
-- `timestamp`：`None` 时自动生成——task 用主时钟 `len(records) / fps`，其他 feature 用自身计数器 `timestamp_start + counter × 1/fps`；传 `float` 则手动指定
+## 合作机构
 
-完整写循环：
+HumanCOIN 由以下机构共同参与建设，logo 墙与项目主页一致。
 
-```python
-FPS = 30
-imu_per_frame = 1000 // FPS   # 33
-eeg_per_frame = 256 // FPS    # 8
-
-for frame in range(60):                        # 2 秒 / 30fps
-    for _ in range(imu_per_frame):             # 高频：每帧多次写入
-        ds.add_frame("observation.imu", imu_sample)
-    for _ in range(eeg_per_frame):
-        ds.add_frame("observation.eeg", eeg_sample)
-
-    ds.add_frame("task", "reach_target")       # ← 帧边界
-
-    ds.add_frame("observation.state", joint_state)    # 低频：每帧一次
-    ds.add_frame("action", action_cmd)
-    ds.add_frame("observation.images.cam", camera_image)
-
-ds.save_episode()    # 落盘全部 buffer，校验对齐/视频帧数，重置计数器
-```
-
-### 读取
-
-```python
-ds = HumanCOINDataset(
-    repo_id="my_dataset", root="data/",
-    episodes=[0, 2],                                    # 只加载 episode 0, 2
-    image_transforms=my_transforms,                      # torchvision transforms
-    delta_timestamps={"observation.state": [-0.1, 0, 0.1]},  # 多帧查询
-    window_overrides={"observation.imu": (-0.066, 0)},   # 覆盖 window
-    video_backend="pyav",
-)
-item = ds[10]
-```
-
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `repo_id` | `str` | — | 数据集名称 |
-| `root` | `str \| Path` | `~/.cache/huggingface/lerobot/<repo_id>` | 存储根目录 |
-| `episodes` | `list[int]` | `None` | 只加载指定的 episode 编号 |
-| `image_transforms` | callable | `None` | 图像变换（torchvision transforms 风格） |
-| `delta_timestamps` | `dict[str, list[float]]` | `None` | 多帧查询：返回 `{key: 主帧与各偏移帧}`，如 `{"observation.state": [-0.1, 0, 0.1]}` |
-| `tolerance_s` | `float` | `1e-4` | `delta_timestamps` 的帧对齐容差 |
-| `video_backend` | `str` | `None` | 视频解码后端（如 `"pyav"`） |
-| `batch_encoding_size` | `int` | `1` | （写入侧）视频批量编码大小 |
-| `window_overrides` | `dict` | `None` | 读取时覆盖各 feature 的 window，如 `{"observation.imu": (-0.066, 0)}` |
-
-深度视频读取：当特征的 `info["video.is_depth_map"] = true` 且 HWC `shape = [H, W, 1]` 时，直接使用 PyAV 解码，返回保留原始数值的 `(1, H, W)` 张量（如 `gray12le` 返回 `uint16`），不转换 RGB、不除以 255。单位和无效值沿用原始数据定义。此功能仅针对读取，尚未实现深度专用编码。
-
-### 读取返回结构
-
-```python
-item = ds[10]
-# {
-#     "timestamp": tensor(0.3333),
-#     "frame_index": tensor(10),
-#     "episode_index": tensor(0),
-#     "index": tensor(10),
-#     "task_index": tensor(0),
-#     "task": "reach_target",
-#
-#     # Window feature: 返回所有读数 + 时间戳
-#     "observation.imu": tensor([33, 6]),
-#     "observation.imu_timestamps": tensor([33]),
-#
-#     # Nearest feature: 返回单个向量
-#     "observation.state": tensor([7]),
-#     "observation.temperature": tensor([1]),
-#
-#     # Video feature: CHW 格式
-#     "observation.images.head_rgb": tensor([3, 480, 640]),
-#
-#     # Audio feature: 一个采样块，[-1, 1] 的 float32
-#     "observation.audio.mic": tensor([533]),
-#
-#     # Audio feature + window (-0.033, 0)：(t-33ms, t] 内的采样拼接
-#     "observation.audio.mic": tensor([528]),
-# }
-```
-
-## 7. 架构设计
-
-```mermaid
-flowchart TB
-    subgraph Entry["入口层"]
-        DS["HumanCOINDataset<br/>dataset.py · 编排器<br/>(继承 LeRobotDataset)"]
-    end
-
-    subgraph Core["核心层"]
-        IX["MasterIndex<br/>index.py"]
-        MD["HumanCOINDatasetMetadata<br/>metadata.py"]
-    end
-
-    subgraph Features["特征层"]
-        PF["ParquetFeature<br/>parquet.py"]
-        VF["VideoFeature<br/>video.py"]
-        AuF["AudioFeature<br/>audio.py"]
-    end
-
-    subgraph Validate["校验层"]
-        CK["DatasetChecker<br/>checker.py"]
-    end
-
-    subgraph Store["存储层"]
-        PQ[("parquet 文件<br/>data/chunk-*/episode_*/")]
-        MP4[("MP4 视频<br/>videos/chunk-*/")]
-        WAV[("WAV 音频<br/>audios/chunk-*/")]
-        META[("元数据<br/>meta/")]
-    end
-
-    DS -->|"帧索引读写"| IX
-    DS -->|"info.json / 元数据"| MD
-    DS -->|"读数写入 / 窗口查询"| PF
-    DS -->|"图像写入 / 视频解码"| VF
-    DS -->|"音频块写入 / WAV 读取"| AuF
-    DS -->|"落盘后校验"| CK
-    PF -->|"保存 / 读取"| PQ
-    VF -->|"编码 MP4"| MP4
-    VF -->|"时间戳表"| PQ
-    AuF -->|"写 WAV"| WAV
-    AuF -->|"时间戳表"| PQ
-    IX -->|"保存"| PQ
-    MD -->|"保存"| META
-    CK -->|"校验报告"| META
-
-    style DS fill:#e8eaf6,stroke:#4fc3f7,stroke-width:2px,color:#000
-    style IX fill:#ffebee,stroke:#ef9a9a,color:#000
-    style MD fill:#fafafa,stroke:#9e9e9e,color:#000
-    style PF fill:#e8f5e9,stroke:#66bb6a,color:#000
-    style VF fill:#f3e5f5,stroke:#ce93d8,color:#000
-    style AuF fill:#e8f5e9,stroke:#66bb6a,color:#000
-    style CK fill:#fff3e0,stroke:#ffcc80,color:#000
-    style PQ fill:#fafafa,stroke:#9e9e9e,color:#000
-    style MP4 fill:#fafafa,stroke:#9e9e9e,color:#000
-    style WAV fill:#fafafa,stroke:#9e9e9e,color:#000
-    style META fill:#fafafa,stroke:#9e9e9e,color:#000
-```
-
-**文件组织：**
-
-```
-src/humancoin/
-├── dataset.py      (341行)  编排器 — add_frame / save_episode / __getitem__
-├── audio.py        (185行)  AudioFeature — 缓冲音频块、写 WAV + 时间戳 parquet
-├── parquet.py      (168行)  ParquetFeature — 写缓冲、存 parquet、加载、窗口查询
-├── video.py        (168行)  VideoFeature — 存 PNG、编码 MP4、解码帧
-├── index.py        (127行)  MasterIndex — 帧索引的读写
-├── metadata.py     (123行)  HumanCOINDatasetMetadata — info.json 管理
-├── checker.py      (162行)  DatasetChecker — 视频帧数 + 音频完整性 + 时间戳对齐校验
-└── utils.py        (236行)  常量 + info.json 创建/校验
-```
-
-**设计原则：**
-
-1. **每 feature 一个对象**：`ParquetFeature`、`VideoFeature` 和 `AudioFeature` 各自封装 buffer、文件路径、读写逻辑。Dataset 只是编排器。
-
-2. **读写对称**：每个 Feature 同时提供 `add/save`（写）和 `load/query`（读）。
-
-3. **路径确定性**：文件路径仅取决于 `episode_index` 和 `feature_key`，无需从 `episodes.jsonl` 查找。
-
-4. **继承而非重写**：继承 `LeRobotDataset` 获取 `start_image_writer`、`_save_image` 等基础能力，只覆写核心的 4 个方法。
-
-## 8. 与原生 LeRobotDataset 对比
-
-| 特性 | 原生 LeRobotDataset | humancoin |
-|------|-------------------|------------|
-| 存储 | 1 个合并 parquet | N 个 per-feature parquet |
-| 多频率传感器 | 需要预先重采样 | 原生速率，独立存储 |
-| 时间对齐 | `tolerance_s` 容差匹配 | Window 机制 (range / interpolate / nearest) |
-| 主时钟 | 相机帧 | `add_frame("task", ...)` 调用 |
-| 视频编码 | `save_episode` 统一批量编码 | 每个 VideoFeature 独立编码 |
-| 元数据 | `episodes.jsonl` 记录所有信息 | 仅记录基本帧信息，路径确定性计算 |
-| per-feature fps | 不支持 | 每个 feature 独立 `fps` |
-| per-feature tolerance | 全局 `tolerance_s` | 每个 feature 独立 `tolerance_s` |
-| 音频存储 | 不支持 | 每 episode 一个 WAV + 时间戳 parquet 索引，最近块读取 |
-| 写入 API | `add_frame(frame_dict, task)` | `add_frame(key, value)` per-field |
-| 对齐校验 | 无 | 自动检查 `alignment_check.jsonl` |
-| 视频校验 | 无 | 自动检查帧数/时长 |
-
-## 9. 致谢
-
-本项目基于以下开源项目与工作：
-
-- **[LeRobot](https://github.com/huggingface/lerobot)** — 基础数据集框架。本项目继承 `LeRobotDataset` 与 `LeRobotDatasetMetadata` 的 API 设计，复用了其视频编码、图像写入等基础设施。感谢 Hugging Face 团队对机器人学习开源生态的贡献。
-
-- **[PyArrow](https://arrow.apache.org/docs/python/)** — 高性能列式存储，per-feature parquet 文件的读写基础。
-
-- **[PyAV](https://pyav.org/)** — FFmpeg 的 Python 绑定，负责视频编码（AV1）与解码。
-
-- **[Matplotlib](https://matplotlib.org/)** — 可视化工具。
-
-- **[Allen Institute for Neural Dynamics](https://alleninstitute.org/division/neural-dynamics/)** 的 [Neuropixels](https://www.neuropixels.org/) 数据格式与 BIDS 标准 — 多模态神经数据组织方式的灵感来源。
-
-感谢所有反馈与讨论的同事。
-
-
-## 构建与发布检查
-
-```bash
-pip install -e ".[dev]"
-python -m unittest discover -s tests -v
-python -m build
-python -m twine check dist/*
-```
-
-wheel 包含数据读写、下载和两种可视化工具。安装 `humancoin` 后即可运行可视化命令，无需下载源码；`examples/` 中的演示脚本需从源码运行。
+<p align="center">
+  <img src="assets/partners.png" alt="HumanCOIN 合作机构：智源研究院、北京大学、中国科学技术大学、清华大学、复旦大学、北京航空航天大学及产业合作伙伴" width="100%">
+</p>

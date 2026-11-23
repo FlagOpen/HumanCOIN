@@ -1,240 +1,834 @@
 # HumanCOIN
 
+<p align="center">
+  <img src="assets/cover.jpg" alt="HumanCOIN report cover: three measurement tiers, proxy signals and scene coverage" width="100%">
+</p>
+
+**A 12,500-hour egocentric manipulation dataset that records the signals behind the action — gaze, surface EMG and EEG — at three measurement depths, on one task ontology and one time base.**
+
+<p align="center">
+  <a href="https://flagopen.github.io/HumanCOIN/">Project page</a> ·
+  <a href="https://arxiv.org/abs/2611.26434">Paper (arXiv:2611.26434)</a> ·
+  <a href="https://flagopen.github.io/HumanCOIN-DataManager/">Data portal</a>
+</p>
+
 > 📖 中文文档：[README_zh-CN.md](README_zh-CN.md)
 
-**A multi-sensor, multi-frequency dataset extension for real-world data, built on LeRobot** — sensors are stored at their independent sampling rates, one parquet file per sensor, dynamically aligned by time window at query time.
+---
+
+## Contents
+
+- [What is HumanCOIN?](#what-is-humancoin)
+- [Quick start](#quick-start)
+- [Download data](#download-data)
+- [What is in the data](#what-is-in-the-data)
+- [On disk](#on-disk)
+- [Reading and alignment](#reading-and-alignment)
+- [Visualization](#visualization)
+- [Using the data: default frames and intent proxies](#using-the-data-default-frames-and-intent-proxies)
+- [How the data was collected](#how-the-data-was-collected)
+- [Comparison with other datasets](#comparison-with-other-datasets)
+- [Recording your own streams](#recording-your-own-streams)
+- [Citation and license](#citation-and-license)
+- [Acknowledgements](#acknowledgements)
+- [Collaborating institutions](#collaborating-institutions)
 
 ---
 
-## Table of Contents
+## What is HumanCOIN?
 
-- [HumanCOIN](#humancoin)
-  - [Table of Contents](#table-of-contents)
-  - [1. Motivation: Why Multi-Frequency Support](#1-motivation-why-multi-frequency-support)
-  - [2. Installation](#2-installation)
-  - [3. Quick Start](#3-quick-start)
-  - [4. Demo & Visualization](#4-demo--visualization)
-    - [4.1 Running the Demo](#41-running-the-demo)
-    - [4.2 Demo 1: Writing (01write_simple.py)](#42-demo-1-writing-01write_simplepy)
-    - [4.3 Demo 2: Reading (01read_simple.py)](#43-demo-2-reading-01read_simplepy)
-    - [4.4 Demo 3: Alignment Tolerance (02tolerance_example.py)](#44-demo-3-alignment-tolerance-02tolerance_examplepy)
-    - [4.5 Demo 4: Window Modes (03window_example.py)](#45-demo-4-window-modes-03window_examplepy)
-    - [4.6 Demo 5: Delta Timestamps (04delta_example.py)](#46-demo-5-delta-timestamps-04delta_examplepy)
-    - [4.7 Demo 6: Asynchronous Sensor Startup (05async_startup_example.py)](#47-demo-6-asynchronous-sensor-startup-05async_startup_examplepy)
-    - [4.8 Demo 7: Audio (06audio_example.py)](#48-demo-7-audio-06audio_examplepy)
-    - [4.9 Visualizer Controls](#49-visualizer-controls)
-  - [5. Core Concepts](#5-core-concepts)
-    - [5.1 Per-Feature Independent Storage](#51-per-feature-independent-storage)
-    - [5.2 Task as the Master Clock](#52-task-as-the-master-clock)
-    - [5.3 Window Parameter](#53-window-parameter)
-  - [6. API Reference](#6-api-reference)
-    - [Creating a Dataset](#creating-a-dataset)
-    - [Feature Definition Format](#feature-definition-format)
-    - [Writing](#writing)
-    - [Reading](#reading)
-    - [Return Structure](#return-structure)
-  - [7. Architecture](#7-architecture)
-  - [8. Comparison with Native LeRobotDataset](#8-comparison-with-native-lerobotdataset)
-  - [9. Acknowledgements](#9-acknowledgements)
+Most egocentric datasets record an observation–action pair: what the camera saw and how the hands moved. A policy trained on that pair learns `π(a | o)` and compresses the operator's intent into its weights; a world model predicts the next observation, but not the state that produced the action. When the policy fails, the data offers no way to tell whether the target was wrong, the grip force was misjudged, or an error signal was missed.
 
+HumanCOIN records that middle. Every episode carries three **wearable proxies for intent**, sampled along the pathway from decision to effect:
+
+- **gaze** — where attention lands before the hand moves;
+- **surface EMG** — how the forearm loads grip force before contact;
+- **scalp EEG** — what the cortex prepares before the motor command.
+
+The proxies are not ground-truth intent. They are lossy measurements of it, and the corpus is designed so that a model can learn `p(a | o, m)` from `m = (m_gaze, m_emg, m_eeg)` and compare it with `p(a | o)`. This distinction matters when you report results: HumanCOIN provides the middle as *measurements and estimates*, not as a latent label.
+
+### A formal view
+
+Let `o` be the observation, `a` the action, and `z` the operator's latent intent. The standard policy marginalises `z` away:
+
+$$
+p(a \mid o) = \int p(a \mid o, z)\, p(z \mid o)\, \mathrm{d}z .
+$$
+
+HumanCOIN does not attempt to observe `z` directly. It records a vector of proxies along the intent pathway,
+
+$$
+m_j = f_j(z_j, o) + \varepsilon_j, \qquad j \in \{\mathrm{gaze},\ \mathrm{emg},\ \mathrm{eeg}\},
+$$
+
+where `f_j` is a lossy, sensor-specific readout and `ε_j` is noise; `m` is not a sufficient statistic for `z`. The supervision the corpus supports is therefore a proxy-conditioned policy,
+
+$$
+p(a \mid o, m),
+$$
+
+together with a proxy model `p(m | o)`. The corpus supports two separate supervised problems:
+
+$$
+\max_\phi\ \mathbb{E}_{(o,m)}\left[\log p_\phi(m \mid o)\right],
+\qquad
+\max_\theta\ \mathbb{E}_{(o,m,a)}\left[\log p_\theta(a \mid o, m)\right].
+$$
+
+The first learns a proxy model wherever `m` is recorded; the second learns a policy wherever actions or action labels are available. Keeping them separate is the point of the tier design: a shallow tier can supply `p(m | o)` supervision without a robot, while L3 supplies the paired `(o, m, a)` needed for the policy.
+
+The scientific question is whether the proxies carry information about the action beyond the observation. The quantity of interest is the conditional mutual information
+
+$$
+I(a; m \mid o) = \mathbb{E}[\log p(a \mid o, m) - \log p(a \mid o)],
+$$
+
+which is non-negative in theory and must be estimated from held-out data in practice: a positive estimate means `m` adds information, a value indistinguishable from zero means intent is redundant with observation for the task at hand. The controlled L3 subset adds measured gaze, pose and finger kinematics `y` as reference targets for the estimated proxies, but `y` is a reference measurement, not ground truth for `z`.
+
+<p align="center">
+  <img src="assets/intent-pathway.jpg" alt="Action policy, world model and proxy-conditioned intent" width="620">
+  <br>
+  <sub>An action policy folds intent into its weights; a world model predicts the future; HumanCOIN records proxies for the intent itself. Figure from the paper.</sub>
+</p>
+
+### Three tiers
+
+The corpus is a ladder, not three unrelated datasets: each tier inherits every proxy of the tier below and adds one more. Hours decrease with signal depth because the instruments get more demanding.
+
+| Tier | Hours | Added intent proxy | Typical streams | Setting | Scenes |
+|------|-------|--------------------|-----------------|---------|--------|
+| **L1 · Attention** | 10,000 | Gaze estimated from headband video (30 Hz) | 2–6 head cameras (20–60 fps), depth, 6-DoF/body/hand pose | Open, unscripted everyday activity | 38 classes |
+| **L2 · Exertion** | 2,000 | Bilateral surface EMG, 8 channels per arm at 2 kHz | Fixed 4-camera headband, 2 wrist views, EMG raw + denoised traces | Open setting, scripted and staged tasks | 21 classes |
+| **L3 · Cognition** | 500 | EEG: 128 channels at 1 kHz (controlled) or 32/8 channels at 250 Hz (open) | 4 head + 2 wrist + eye camera + third-person views, eye tracker, 3×6-DoF trackers, hand skeleton | ≈350 h controlled desk + ≈150 h open | 9 classes |
+
+L1 records no EMG or EEG; L2 adds EMG; L3 adds EEG and, in its controlled subset, direct measurements of gaze, head/wrist pose and finger kinematics. Those direct measurements are the **reference** against which the estimates used in the shallower tiers can be scored — not ground truth for intent itself.
+
+### At a glance
+
+| Axis | Value |
+|------|-------|
+| Scale | 12,500 h · 1.35 B master frames at 30 fps · collected at 6 sites |
+| Scenes | 38 classes in 5 zones (residential, commercial, professional, industrial, public) + 1 residual |
+| Tasks | 99 task verbs + 46 motion verbs; about 10 subtask stages per episode |
+| Objects | 635 annotated object classes; 839 measured instances with shape, size, weight, material and colour |
+| Signals | multi-view RGB, metric depth and point clouds, 6-DoF head/wrist pose, finger kinematics, gaze, sEMG, EEG, IMU, microphone |
+| Episodes | mean 88 s (L1 101 s, L2 65 s, L3 60 s); density peak at 52 s |
+| Format | LeRobot-style: one Parquet per stream, a master index, MP4 video, and WAV audio where present; each release declares its `codebase_version` in `meta/info.json` |
+| License | data CC BY-NC 4.0; code Apache-2.0 |
+
+<p align="center">
+  <img src="assets/overview.jpg" alt="HumanCOIN distribution: tiers, episode length, task depth, scenes, verbs and objects" width="100%">
+  <br>
+  <sub>The corpus in one view: tier hours, episode length, task depth, 38 scene classes, 99 task verbs and 635 object classes. Figure from the paper.</sub>
+</p>
+
+<p align="center">
+  <img src="assets/scenes.jpg" alt="One head-camera frame from each of the 38 scene classes" width="75%">
+  <br>
+  <sub>One head-camera frame per scene class, grouped by zone. Figure from the paper.</sub>
+</p>
+
+**Catalog vs. corpus.** 12,500 h is the full documented corpus. Data is released in batches, so the live catalog is smaller and grows over time — in the 2026-11 snapshot the portal listed 689 repositories, 12,119 episodes and roughly 530 h (about 7.5 TB). Always use the counters and dataset cards in the [data portal](https://flagopen.github.io/HumanCOIN-DataManager/) as the source of truth for what can be downloaded today. For access to later batches, the portal asks you to email `humancoin@163.com`.
 
 ---
 
-## 1. Motivation: Why Multi-Frequency Support
+## Quick start
 
-Real-world data collection often requires multiple sensors to capture the same process: cameras record visual information, IMUs measure motion, and EEG and EMG capture physiological signals. Human behavior research, wearable devices, experimental recording, and environmental sensing all involve combining such data. Sensors differ in sampling rate, startup time, and data format, so their individual time series need to be preserved and aligned when used.
+From zero to a decoded frame of real HumanCOIN data in about five minutes. The example is a 65 MB, 29 s L1 repository; any other repository from the portal works the same way.
 
-Common sensors operate at very different sampling rates:
+### 1. Install
 
-| Sensor | Typical rate | Shape | Example |
-|--------|---------|------|------|
-| Camera RGB | 30 / 60 Hz | 480×640×3 | scene camera + wearable camera |
-| IMU | 50-1000 Hz | 6 (accel×3 + gyro×3) | accelerometer + gyroscope |
-| EEG | 256 / 512 / 1000 Hz | 8-256 channels | brain signals |
-| EMG | 20-500 Hz | 4-16 channels | muscle signals |
+```bash
+pip install -U "humancoin>=0.1.1"
+```
 
-Forcing streams with different sampling rates into a table at a single frame rate typically requires upsampling low-rate data and downsampling or aggregating high-rate data, which can discard original samples. This project builds on LeRobot’s dataset infrastructure to support independent sensor storage and time-based queries.
+Python 3.10–3.13. The package pins LeRobot 0.3.3 and brings the downloader, dataset reader and both visualizers.
 
-**The humancoin solution**: every sensor is stored independently as a time-indexed parquet file. At read time, a `window` parameter defines "how to aggregate data around the query timestamp" — no pre-resampling needed.
+### 2. Choose a dataset and download it
 
-**Writing** — `add_frame` routes each key to its feature buffer; `save_episode()` flushes them to disk:
+Open the **[HumanCOIN DataManager](https://flagopen.github.io/HumanCOIN-DataManager/)**, filter by tier, modality, scene, task or resolution, select one or more repositories, choose Hugging Face or ModelScope, then click **Generate Download Command**. The portal fills in the repository name and the revision for the selected source:
+
+```bash
+humancoin-download --hub huggingface \
+  --datasets 'HumanCOIN/l1_study_room_fill_task_1920x1456_30fps_2views' \
+  --revision 'b1b5d76c9a06d100733f4e4eac1a3e5f8942dfba' \
+  --target-dir ./data --max-workers 8
+```
+
+Files land in `./data/HumanCOIN/<repository-name>/`. An L1 repository groups one or more `<task-name>/` recordings, and each task directory is a complete dataset; L2 and L3 repositories are flat and can be loaded from the repository root. Most datasets are gated: request access on the dataset's Hugging Face page once, then authenticate in the same terminal before downloading:
+
+```bash
+hf auth login
+hf auth whoami
+```
+
+For ModelScope, request access there, create an access token with the same account and export `MODELSCOPE_TOKEN`; see [ModelScope: access and token](#modelscope-access-and-token).
+
+> **Trying the deepest tier instead?** `l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8` is a 28 s, 188 MB L3 episode with 128-channel EEG and 8-channel EMG — the cheapest way to see the full sensor set.
+
+### 3. Read one frame
+
+```python
+from pathlib import Path
+from humancoin import HumanCOINDataset
+
+REPO = "HumanCOIN/l1_study_room_fill_task_1920x1456_30fps_2views"
+repo_dir = Path("data") / REPO
+task_dir = repo_dir if (repo_dir / "meta/info.json").is_file() else next(
+    p for p in sorted(repo_dir.iterdir()) if (p / "meta/info.json").is_file()
+)
+
+ds = HumanCOINDataset(repo_id=REPO, root=task_dir)
+
+print(task_dir.name)                        # l1_study_room_fill_box_<hash>
+print(len(ds), "frames @", ds.fps, "fps")   # 882 frames @ 30.0 fps
+frame = ds[0]
+
+print(frame["observation.images.head_left_rectified"].shape)  # (3, 1456, 1920)
+print(frame["observation.head_pose"].shape)                   # (7,)
+print(frame["eye_gaze_predict"].shape)                        # (2,)
+print(frame["task"])                                          # task string
+```
+
+Every key in `frame` comes from one episode of one task directory. `ds[i]` first looks up the i-th master-clock timestamp, then resolves each stream around that time; no stream is pre-resampled. For a flat L2/L3 repository, pass the repository root as `root` directly.
+
+### 4. Look at it
+
+```bash
+# point the viewer at the task directory printed above (for a flat L2/L3 repo, use the repo root)
+TASK=$(dirname "$(dirname "$(find "data/HumanCOIN/l1_study_room_fill_task_1920x1456_30fps_2views" -path '*/meta/info.json' | head -n 1)")")
+humancoin-visualize-web "$TASK"
+```
+
+The browser viewer opens on `http://127.0.0.1:8000` and lets you scrub frames, drag the time window, inspect every stream and filter EEG/EMG. See [Visualization](#visualization) for the desktop viewer and controls.
+
+---
+
+## Download data
+
+There are two supported ways to get the corpus: the portal with the `humancoin-download` command it generates, or the same command typed by hand. The portal is the recommended route because it resolves names, revisions, sizes and access requirements for you.
+
+### The download portal
+
+The **[HumanCOIN DataManager](https://flagopen.github.io/HumanCOIN-DataManager/)** is the public catalog for released data.
+
+<p align="center">
+  <img src="assets/portal-explore.png" alt="Data portal Explore Datasets: search, sort and dataset cards with Preview and Download actions" width="78%">
+  <br>
+  <sub>Explore Datasets: search and compare released repositories; each card exposes its sensor set, size and Preview/Download actions.</sub>
+</p>
+
+<p align="center">
+  <img src="assets/portal-preview.png" alt="Data portal dataset card: task, sensor metadata, episodes, duration, size, license and Get Download Command" width="62%">
+  <br>
+  <sub>A dataset card: task description, per-stream metadata, episode count, duration, size, license, and the <b>Get Download Command</b> entry point.</sub>
+</p>
+
+1. **Browse.** The overview reports published repositories, episodes, hours and Hugging Face downloads. **Explore Datasets** filters by data level (L1/L2/L3), modality (RGB, depth, hand pose, gaze, eye camera, EMG, EEG, glove/Manus, audio, IMU), scene, task and main-camera resolution.
+2. **Preview.** A dataset card shows the task description, episodes, duration, size, resolution, license and the exact stream list. Full video previews stream from Hugging Face, so gated repositories need access first.
+3. **Select.** Tick one or more complete repositories. The selection is kept in browser storage and can be exported/imported as `selection.json`, which is useful for sharing a reproducible subset.
+4. **Choose a source.** Hugging Face or ModelScope. A repository may exist on one hub only; the portal tells you which download commands are available.
+5. **Generate the command.** The generated command selects the revision shown on the card — a commit on Hugging Face, usually `master` on ModelScope — so the download follows the catalog snapshot:
 
 ```mermaid
 flowchart LR
-    AF["add_frame(key, value)"]
-    IX["MasterIndex record_frame(ts, task)"]
-    PF["ParquetFeature buffer.append(ts, data)"]
-    VF["VideoFeature save PNG + timestamp list"]
-    AuF["AudioFeature buffer chunks + timestamp list"]
-
-    MI[("master_index.parquet timestamp | task | frame_index")]
-    P1[("imu.parquet 1000Hz × 6d")]
-    P2[("eeg.parquet 256Hz × 8d")]
-    P3[("state.parquet 30Hz × 7d")]
-    C1[("head_rgb.parquet timestamps only")]
-    V1[("head_rgb.mp4 30fps video")]
-    A1[("mic.parquet timestamp | num_samples")]
-    W1[("mic.wav 16kHz audio")]
-
-    AF -->|"key = task"| IX
-    AF -->|"key = sensor<br/>imu / eeg / state"| PF
-    AF -->|"key = video"| VF
-    AF -->|"key = audio"| AuF
-    IX --> MI
-    PF --> P1
-    PF --> P2
-    PF --> P3
-    VF --> C1
-    VF --> V1
-    AuF --> A1
-    AuF --> W1
-
-    style AF fill:#fafafa,stroke:#9e9e9e,color:#000
-    style IX fill:#e1f5fe,stroke:#4fc3f7,color:#000
-    style PF fill:#fafafa,stroke:#9e9e9e,color:#000
-    style VF fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style AuF fill:#e8f5e9,stroke:#66bb6a,color:#000
-    style MI fill:#e1f5fe,stroke:#4fc3f7,color:#000
-    style P1 fill:#fff3e0,stroke:#ff9800,color:#000
-    style P2 fill:#fff3e0,stroke:#ff9800,color:#000
-    style P3 fill:#fce4ec,stroke:#e91e63,color:#000
-    style C1 fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style V1 fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style A1 fill:#e8f5e9,stroke:#4caf50,color:#000
-    style W1 fill:#e8f5e9,stroke:#4caf50,color:#000
+    A["Portal: filter, preview, select"] --> B["Choose Hugging Face / ModelScope"]
+    B --> C["Generate command<br/>repository + revision"]
+    C --> D["humancoin-download"]
+    D --> E["data/HumanCOIN/REPO/"]
+    E --> F["HumanCOINDataset<br/>root = task directory"]
 ```
-
-**Reading** — look up the master-clock timestamp in `master_index`, then query each feature by that timestamp:
-
-```mermaid
-flowchart TD
-    IDX["ds[10]"] -->|"① look up frame 10"| MI[("master_index.parquet timestamp | task | frame_index")]
-    MI -->|"② get timestamp"| TS["t = 0.333s"]
-    TS -->|"③ nearest<br/>closest row in time"| P3[("state.parquet 30Hz × 7d")]
-    TS -->|"③ window=(-0.033, 0] all rows in range"| P1[("imu.parquet 1000Hz × 6d")]
-    TS -->|"③ window=(-0.033, 0] all rows in range"| P2[("eeg.parquet 256Hz × 8d")]
-    TS -->|"③ nearest, closest row in time"| C1[("head_rgb.parquet timestamp")]
-    C1 -->|"④ get frame_index"| V1[("rgb → 480×640×3")]
-    P3 -->|"1 row"| RS["state → [7]"]
-    P1 -->|"33 rows"| RI["imu → [33, 6]"]
-    P2 -->|"8 rows"| RE["eeg → [8, 8]"]
-    V1 -->|"1 frame"| RV["head_rgb → [3, 480, 640]"]
-
-    style IDX fill:#fafafa,stroke:#9e9e9e,color:#000
-    style MI fill:#e1f5fe,stroke:#4fc3f7,color:#000
-    style TS fill:#fafafa,stroke:#9e9e9e,color:#000
-    style P3 fill:#fce4ec,stroke:#e91e63,color:#000
-    style P1 fill:#fff3e0,stroke:#ff9800,color:#000
-    style P2 fill:#e8f5e9,stroke:#4caf50,color:#000
-    style C1 fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style V1 fill:#f3e5f5,stroke:#9c27b0,color:#000
-    style RS fill:#fce4ec,stroke:#e91e63,color:#000
-    style RI fill:#fff3e0,stroke:#ff9800,color:#000
-    style RE fill:#e8f5e9,stroke:#4caf50,color:#000
-    style RV fill:#f3e5f5,stroke:#9c27b0,color:#000
-```
-
-The result of `ds[10]` (t=0.333s):
-- `state` → nearest match → `[7]`
-- `imu` → all 33 readings in the `(-0.033, 0]` window → `[33, 6]`
-- `eeg` → all 8 readings in the `(-0.033, 0]` window → `[8, 8]`
-- `head_rgb` → nearest row in timestamp parquet → `frame_index` → decode that frame → `[3, 480, 640]`
-
-## 2. Installation
-
-Python **3.10–3.13** (verified with Python 3.12). LeRobot is currently pinned to **0.3.3**.
-
-Install from [PyPI](https://pypi.org/project/humancoin/):
 
 ```bash
-pip install humancoin
+humancoin-download --hub huggingface \
+  --datasets 'HumanCOIN/<repository>' \
+  --revision '<commit-hash>' \
+  --target-dir ./data --max-workers 8
 ```
 
-Or install from source:
+Run it in the same terminal where you authenticated. `--dry-run` prints the destination and include/exclude patterns without downloading anything.
+
+### Repository names
+
+The name encodes enough to browse without opening every card:
+
+```text
+l1_study_room_fill_task_1920x1456_30fps_2views
+│  │          │    │        │      │     └─ 2 released camera views
+│  │          │    │        │      └─ frame rate
+│  │          │    │        └─ main camera resolution
+│  │          │    └─ task
+│  │          └─ scene
+│  └─ tier
+```
+
+L2 and L3 names add the sensor kit, for example `..._9views_emg8` or `..._12views_eeg128_emg8`. Scene, task and view count are also searchable in the portal, so you rarely need to parse a name by hand.
+
+### CLI reference
 
 ```bash
-git clone https://github.com/FlagOpen/HumanCOIN
-cd HumanCOIN
-pip install -e .
+humancoin-download --help
+# also available as: python -m humancoin.download --help
 ```
 
-Dependencies:
+| Flag | Meaning |
+|------|---------|
+| `--hub {huggingface,modelscope}` | source hub (default `huggingface`) |
+| `--datasets A B ...` | one or more repository names or `owner/name` IDs; `--ds_lists` is an alias |
+| `--revision REV` | branch, tag or commit; the portal fills in the source-specific revision (a commit on Hugging Face, usually `master` on ModelScope) |
+| `--target-dir DIR` | download root (default `~/.cache/huggingface/lerobot`); files go to `DIR/HumanCOIN/<name>` |
+| `--max-workers N` | parallel file downloads (default 8) |
+| `--include ...` / `--exclude ...` | relative-path globs for partial downloads |
+| `--dry-run` | print the plan without downloading |
+| `--token TOKEN` | access token; prefer `HF_TOKEN` / `MODELSCOPE_TOKEN` (`MS_TOKEN` also accepted) |
+| `--namespace NAME` | namespace for bare names (default `HumanCOIN`) |
 
-| Dependency | Purpose |
-|------|------|
-| `lerobot` | base dataset framework (inherits LeRobotDataset) |
-| `pyarrow` | parquet file I/O |
-| `numpy` / `torch` | data processing |
-| `av` (PyAV) | video encoding/decoding |
-| `matplotlib` | visualization |
-| `scipy` | web visualizer signal filtering |
-
-### Download HumanCOIN datasets
-
-Browse dataset names on [Hugging Face](https://huggingface.co/HumanCOIN) or [ModelScope](https://www.modelscope.cn/organization/HumanCOIN). These are organization pages; pass a dataset name from the selected hub to the command below.
+Examples:
 
 ```bash
-pip install humancoin
+# several repositories in one invocation
+humancoin-download --hub huggingface \
+  --datasets 'HumanCOIN/l1_study_room_fill_task_1920x1456_30fps_2views' \
+             'HumanCOIN/l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8' \
+  --target-dir ./data --max-workers 8
 
-# Replace DATASET_NAME with an actual dataset repository name
-humancoin-download --hub huggingface --datasets DATASET_NAME --target-dir ./data
-humancoin-download --hub modelscope --datasets DATASET_NAME --target-dir ./data
+# inspect the storage plan before committing disk
+humancoin-download --datasets 'HumanCOIN/l1_study_room_fill_task_1920x1456_30fps_2views' \
+  --target-dir ./data --dry-run
 
-# Download only selected files (partial download; may not be loadable as a full dataset)
-humancoin-download --datasets DATASET_NAME --include "meta/*" README.md --target-dir ./data
-
-# Multiple datasets; preview without downloading
-humancoin-download --datasets DATASET_A DATASET_B --target-dir ./data --dry-run
-# Also available as: python -m humancoin.download ...
+# flat L2/L3 repository: metadata and calibration only (small, but not loadable)
+humancoin-download --datasets 'HumanCOIN/<repository>' --target-dir ./data \
+  --include "meta/*" "calibrations/*"
 ```
 
-The default namespace is `HumanCOIN`; explicit `owner/name` IDs are also accepted. `--ds_lists` is an alias for `--datasets`. Files are stored under `<target-dir>/HumanCOIN/<dataset-name>`; the default target directory is `~/.cache/huggingface/lerobot`. Repeating a download reuses files through the hub SDK. Use `--revision` to select a version and `--max-workers` to control parallel downloads. Private/gated datasets require access and `HF_TOKEN` or `MODELSCOPE_TOKEN` (or `--token`); ModelScope uses the lightweight `modelscope-hub` SDK; credentials are passed to the client or read from its login cache. `MS_TOKEN` is also accepted. A failed dataset does not stop the remaining downloads; the command exits nonzero if any fail.
+Re-running a download is safe: the hub SDK reuses files already present, so an interrupted transfer resumes. A failure on one repository does not stop the others; the process exits nonzero if any of them failed.
+
+### ModelScope: access and token
+
+ModelScope mirrors the catalog. For a gated repository:
+
+<p align="center">
+  <img src="assets/portal-selection.png" alt="Data portal selection bar with a selected L2 repository, ModelScope source and Generate Download Command" width="100%">
+  <br>
+  <sub>Select one or more complete repositories, switch the source to <b>ModelScope</b>, then click <b>Generate Download Command</b>. The same bar exports <code>selection.json</code> for later import.</sub>
+</p>
+
+1. Request access on the ModelScope dataset page with the account you will use for downloading.
+2. Create a [ModelScope access token](https://modelscope.cn/my/myaccesstoken) from that same account.
+3. In the Bash terminal you will use for the download, export the token interactively so it does not land in shell history:
+
+```bash
+read -rsp 'ModelScope Token: ' MODELSCOPE_TOKEN
+printf '\n'
+export MODELSCOPE_TOKEN
+```
+
+4. Run the command generated by the portal. ModelScope commands use `--hub modelscope` and usually `--revision 'master'`:
+
+```bash
+humancoin-download --hub modelscope \
+  --datasets 'HumanCOIN/l2_workroom_write_workpiece_markings_left_1920x1200_30fps_9views_emg8' \
+  --revision 'master' \
+  --target-dir ./data --max-workers 8
+```
+
+Files land in `./data/HumanCOIN/<repository>/`, with the same task-directory layout as the Hugging Face path. `--dry-run`, `--include`/`--exclude` and the portal's `selection.json` work the same for both hubs; only the hub and revision differ. The downloader reads `MODELSCOPE_TOKEN` or `MS_TOKEN`; `--token` also works, but exporting avoids pasting the secret into a command that may be saved. `master` is a mutable branch: pin a commit or tag when you need byte-identical reproducibility.
+
+### Access, disk and verification
+
+- **Gated data.** Most HumanCOIN repositories are gated (`auto` approval). Open the dataset page on Hugging Face, request access, wait for approval, then `hf auth login`. A 401/403 from the downloader usually means the approval is missing or the token belongs to a different account.
+- **ModelScope.** See [ModelScope: access and token](#modelscope-access-and-token) for requesting access, exporting `MODELSCOPE_TOKEN` and running the portal command.
+- **Disk.** Sizes vary widely: the quick-start L1 example is 65 MB, while L2/L3 repositories are multi-GB and the largest exceed 60 GB. The full published catalog is roughly 7.5 TB. Check the size on the card before selecting a tier; `df -h` is cheaper than a failed download.
+- **Verify.** A flat L2/L3 repository has `meta/info.json` at its root; an L1 repository has one `<task>/meta/info.json` per recording. In either case a complete task directory also has at least one `data/chunk-*/episode_*/master_index.parquet`. If `meta/` exists but no `data/`, the download was partial or is still running.
+
+---
+
+## What is in the data
+
+One episode is a time-aligned record of a person doing a task in a real scene, with the body, the scene and the signals behind the action all placed in one coordinate frame and on one clock.
+
+<p align="center">
+  <img src="assets/episode.jpg" alt="Anatomy of one controlled L3 episode" width="100%">
+  <br>
+  <sub>One controlled L3 episode at t = 27.6 s. (a) metric point cloud with head pose, hand skeletons and 6-DoF wrist poses; (b) eight synchronized views plus depth; (c) step and object annotation; (d) gaze, EMG and EEG of the same interval on one time axis. Figure from the paper.</sub>
+</p>
+
+### Views and geometry
+
+- **Head cameras.** L1 uses 14 third-party headband models from 13 vendors: 2–6 lenses, 20–60 fps, from 512×512 rectified to 3840×1200. L2 and L3 use a head-mounted multi-camera rig, typically four lenses at 1920×1200 and 30 fps; the front pair is hardware-synchronized. A released stream may be downscaled (for example, the L3 head view ships at 640×360 in some repositories), so always read the shape from `info.json`.
+- **Wrist and third-person cameras.** L2 adds two wrist views; L3 adds two 640×480 wrist cameras, a 1600×1200 eye-tracker scene camera, and — in the controlled subset — a third-person RGB-D view. L3 repositories can carry 5–12 released views depending on the kit.
+- **Depth and point clouds.** Depth is reconstructed from the front stereo pair with FoundationStereo, stored with the intrinsics that produced it, and projected into per-frame point clouds. Camera views are released raw and rectified where the release provides both; rectification parameters ship with the episode.
+- **Pose and hands.** Head, both wrists and the chest share one metric frame: `+x` left, `+y` up, `+z` forward; translations in millimetres, joint angles in degrees. A pose stream is stored either as 7 values (position + quaternion) or 6 values (position + Euler angles); read its `names` to know which. In the controlled L3 subset, three 6-DoF trackers (≈800 Hz device rate) and 20-node gloves measure pose and 20 joint angles per hand; at L1, L2 and open L3 the same quantities are estimated from video.
+
+### Intent proxies
+
+| Proxy | Stream (typical) | Rate | Measured or estimated |
+|-------|------------------|------|-----------------------|
+| Gaze | `observation.eye_gaze` (controlled L3); `eye_gaze_predict` (L1, L2, open L3) | 200 Hz measured; 30 Hz estimated | measured in controlled L3, predicted elsewhere |
+| Surface EMG | `observation.left_wrist_emg` and its raw/denoised variants (`*_raw`, `*_denoise`; names vary) | 2 kHz, 8 channels per arm | measured from L2 onward |
+| EEG | `observation.eeg_raw`, `observation.eeg_denoise` (names vary by release) | 1 kHz × 132 columns (128-channel cap) controlled; 250 Hz × 32/8 open | measured at L3 |
+
+Gaze is a pixel coordinate in the scene camera (controlled L3) or in the rectified head view (everywhere else). EMG is released as raw and denoised traces; derive an envelope if your analysis needs one. EEG is released as acquired, filtered, and repaired where available; the exact column set is listed in each repository's `meta/info.json`.
+
+
+### Annotations
+
+Annotation is step-level, not just clip-level. Every step carries a sentence, a **task verb** (99 classes: wipe, open, fold, close, arrange…), a working hand, the objects it touches, and a set of **motion verbs** (46 classes, on average 2.5 per step: pick, place, move, grasp…). At L2 and L3 the object record can include measured shape, size, weight, material and colour (availability varies by release), so EMG activity can be read against object attributes rather than a guessed label.
+
+Episodes also carry timed task stages, key events, state changes, and — in controlled L3 — phase markers for the imagery and execution segments. The annotation ships as structured JSON next to the episode, and is exported into LeRobot language columns for training.
+
+---
+
+## On disk
+
+A **task directory** is a self-contained LeRobot-style dataset. A repository holds either one task directory at its root (L2/L3) or several task directories (L1); the exact stream set depends on the tier and kit, the layout does not.
+
+```text
+l1_study_room_fill_task_1920x1456_30fps_2views/     # repository
+├── README.md
+├── preview.jpg
+├── portal.yaml
+└── l1_study_room_fill_box_<hash>/                  # task directory = dataset root
+    ├── data/
+    │   └── chunk-000/
+    │       └── episode_000000/
+    │           ├── master_index.parquet            # timestamp | frame_index | episode_index | index | task_index
+    │           ├── observation.head_pose.parquet
+    │           ├── observation.hand_left_points.parquet
+    │           ├── observation.body_pose.parquet
+    │           └── ...                             # one Parquet per signal
+    ├── videos/
+    │   └── chunk-000/
+    │       ├── observation.images.head_left_rectified/
+    │       │   └── episode_000000.mp4
+    │       └── ...
+    ├── audios/                                     # when the unit records a microphone
+    │   └── chunk-000/...
+    ├── calibrations/
+    │   ├── dataset_manifest.json
+    │   ├── rectify_params.yaml
+    │   └── source_camera_calibration.json
+    ├── annotation/
+    │   └── episode_000000_structured.json
+    └── meta/
+        ├── info.json                               # features, shapes, fps, windows, path templates
+        ├── episodes.jsonl
+        ├── episodes_stats.jsonl
+        ├── tasks.jsonl
+        ├── readme.json                             # per-task release summary
+        ├── collect_info.jsonl                      # when present: collector, hardware, scene, objects
+        ├── alignment_check.jsonl                   # when present: per-stream timing audit
+        └── qc_reports.jsonl                        # when present: quality-control findings
+```
+
+L2 and L3 repositories skip the extra level: `data/`, `videos/` and `meta/` sit directly under the repository root. `meta/info.json` is the file that tells you which shape you have — if it is not at the repository root, descend into a child directory that contains it. The exact metadata set varies by release: `info.json`, `episodes.jsonl`, `episodes_stats.jsonl`, `tasks.jsonl` and `readme.json` are common; L2/L3 can add `collect_info.jsonl`, `alignment_check.jsonl`, `calibrations.jsonl`, `source_sessions.jsonl` and `qc_reports.jsonl`.
+
+Every signal is one Parquet file on its own time base:
+
+```text
+timestamp (float64) | episode_index (int64) | channel_0 ... channel_D
+```
+
+- `timestamp` is seconds from the start of the recording, stored as recorded. Nothing is snapped to the master grid, so native rates, device jitter and gaps survive in the file.
+- `master_index.parquet` is the fixed-rate spine (30 fps in the released data). Reading `ds[i]` starts here and resolves every other stream from its own timestamps.
+- Pixels are not stored in Parquet. RGB views are H.264 MP4 at 30 fps; the matching `observation.images.*.parquet` lists the timestamp of every frame. Raw and rectified encodings live side by side.
+- Audio, where present, is 16 kHz mono PCM WAV plus a Parquet table recording the sample count contributed by each master frame.
+- Calibration (camera intrinsics and distortion, rectification parameters, tracker-to-frame transforms, eye-tracker calibration) ships with the episode, so geometry can be re-derived instead of accepted.
+- Names are literal: `*_raw` is the stream as acquired, `eeg_denoise` / `*_emg_denoise` (or `.denoised`) is the cleaned trace, and an EMG envelope can be derived from the cleaned trace.
+
+A repository may contain more metadata or a different subset of streams than the sketch above. The authoritative feature list is always:
 
 ```python
-from humancoin import HumanCOINDataset
-
-ds = HumanCOINDataset(
-    repo_id="HumanCOIN/DATASET_NAME",
-    root="data/HumanCOIN/DATASET_NAME",
-)
-item = ds[0]
+for key, spec in ds.meta.features.items():
+    if key in {"timestamp", "frame_index", "episode_index", "index", "task_index"}:
+        continue
+    print(f"{key:48s} {spec.get('dtype', ''):8s} {tuple(spec.get('shape', ()))}")
 ```
 
-Downloads preserve the repository files; loading requires the multi-frequency dataset layout supported by this project. Downloading does not convert other formats.
+---
 
-## 3. Quick Start
+## Reading and alignment
+
+### Master clock and windows
+
+The dataset's frame rate defines a **master clock**. Frame `i` has timestamp `t = i / fps` in the episode's master time base. Every other stream keeps its native timestamps; when you read `ds[i]`, each feature is resolved around `t` according to its `window`:
+
+| `window` | Returned value | Typical use |
+|----------|----------------|-------------|
+| `None` (default) | one nearest sample | 30 Hz state, RGB frame, one audio chunk |
+| `"interpolate"` | linear interpolation at `t` | mid-rate pose or trajectory |
+| `(start, end)` | all samples in `(t + start, t + end]`, plus `"<key>_timestamps"` | gaze, EMG, EEG, high-rate IMUs |
+
+The window is a read-time decision stored in `meta/info.json`, so the same repository can be consumed at different temporal resolutions without rewriting data. Override it per feature when constructing the dataset:
+
+```python
+ds = HumanCOINDataset(
+    repo_id="HumanCOIN/l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8",
+    root="data/HumanCOIN/l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8",
+    window_overrides={
+        "observation.eye_gaze": (-1 / 30, 0.0),
+        "observation.eeg_denoise": (-1 / 30, 0.0),
+        "observation.left_wrist_emg": (-1 / 30, 0.0),
+    },
+)
+
+item = ds[100]
+print(item["timestamp"])                          # tensor(3.3333)
+print(item["observation.eye_gaze"].shape)         # ~[6, 2]
+print(item["observation.eeg_denoise"].shape)      # ~[33, 132]
+print(item["observation.left_wrist_emg"].shape)   # ~[66, 8]
+print(item["observation.images.head_rgb"].shape)  # [3, 360, 640]
+print(item["action"].shape)                       # [58]
+```
+
+> **Check the keys before looping.** Feature names can shift slightly between releases (for example `observation.left_wrist_emg` in the card versus `*_emg_raw` / `*_emg_denoise` in the Parquet files). Print `ds.meta.features` for the exact keys of the checkout you downloaded.
+
+<p align="center">
+  <img src="assets/read-path.png" alt="Read path: master index, per-stream clocks, window, interpolation and nearest-sample queries" width="720">
+  <br>
+  <sub>Read path (paper Fig. 6b). A fixed-rate master index defines frame <code>n</code>; each stream is resolved from its own clock — a window for EEG/EMG, interpolation for gaze, nearest sample for RGB — without resampling the data. Figure from the paper.</sub>
+</p>
+
+The first time an episode is touched, each stream's Parquet is loaded and cached; subsequent frames from that episode are cheap. Video frames are decoded on demand. Sequential access is therefore much faster than random access across episodes, and `num_workers > 0` multiplies memory because each worker gets its own cache.
+
+### Index columns and task labels
+
+`item` also contains `timestamp`, `frame_index`, `episode_index`, `index`, `task_index` and `task`. `index` is global across the repository; `task` is the string for the current frame. In L3, `observation.state` and `action` are 58-D fused vectors: both wrist poses and the head pose (18 values) plus 40 finger joint angles.
+
+### Subsets, offsets and delta timestamps
+
+```python
+# load only selected episodes
+ds = HumanCOINDataset(repo_id=..., root=..., episodes=[0, 2])
+
+# stack one feature over offsets around every queried frame
+ds = HumanCOINDataset(
+    repo_id=..., root=...,
+    delta_timestamps={"observation.head_pose": [-0.5, 0.0, 0.5]},
+)
+item = ds[100]
+print(item["observation.head_pose"].shape)   # [3, 7]
+```
+
+`delta_timestamps` is intended for short temporal context. The current implementation applies one offset list to the features being stacked, so pass a single offset list when you rely on per-feature alignment.
+
+### Depth, audio and missing data
+
+- **Depth.** When metadata marks `video.is_depth_map` and declares an `(H, W, 1)` shape, the view is decoded as `(1, H, W)` in its native sample format (for example `uint16` for `gray12le`), without RGB conversion or `/255`. Some releases store depth as `(H, W)`; check `shape` and `video.is_depth_map` in `info.json` before treating a depth stream as RGB. Units and invalid values are those of the stored data.
+- **Audio.** Nearest-window reads return one whole chunk; a `(start, end)` window returns a sample-precise slice across chunk boundaries, concatenated. Chunks are labelled by their first sample and advance at exactly `1 / sample_rate`.
+- **Missing samples.** Lost tracking, invalid gaze and dead EEG channels appear as `NaN` or empty windows rather than fabricated values. High-rate windows can legitimately vary in length by one or two samples because timestamps are not snapped to the grid.
+
+### Batching
+
+Window features are variable-length, so PyTorch's default collate will fail. Either pad/crop in the model or use a list collate:
+
+```python
+from torch.utils.data import DataLoader
+
+def collate(batch):
+    return {key: [b[key] for b in batch] for key in batch[0]}
+
+loader = DataLoader(ds, batch_size=4, shuffle=True, collate_fn=collate, num_workers=0)
+```
+
+---
+
+## Visualization
+
+### Portal preview
+
+The [data portal](https://flagopen.github.io/HumanCOIN-DataManager/) is the fastest way to look at a repository before downloading it: each card opens a preview with the task description, poster frame, sensor list, episode count, duration, size and resolution. Full video previews are streamed from Hugging Face, so gated repositories require access.
+
+### Browser viewer (recommended for real data)
+
+```bash
+# DATASET_ROOT is a task directory; for a flat L2/L3 repository it is the repository root
+humancoin-visualize-web "<dataset-root>"
+# choose a port or bind address if needed
+humancoin-visualize-web "<dataset-root>" --port 8080 --no-browser
+```
+
+The viewer serves a local page with synchronized camera panels, per-stream signal strips, a draggable time window, a 3D pose/hand-skeleton view where those streams exist, and — when the release includes an impedance snapshot — a color-coded EEG electrode grid. On EEG and EMG strips you can apply a zero-phase Butterworth high-pass/low-pass and a comb notch at the line frequency and its harmonics; the same filter is available over the API, for example `filt=observation.eeg_denoise:hp=0.5,lp=40,notch=50`. The filter is a display/analysis convenience, not a replacement for a documented preprocessing pipeline.
+
+<p align="center">
+  <img src="assets/visualizer.png" alt="HumanCOIN browser visualizer on a real L3 episode: full camera wall, 3D pose, EMG, IMU and gaze strips" width="100%">
+  <br>
+  <sub>The browser viewer on a real L3 episode (<code>l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8</code>, frame 381/848): the full raw/rectified camera wall, the 3D head/wrist/hand-skeleton view, and the EMG, IMU and gaze strips on the master timeline.</sub>
+</p>
+
+### Desktop viewer
+
+```bash
+humancoin-visualize "<dataset-root>" --episode 0
+```
+
+
+| Key | Action |
+|-----|--------|
+| `space` | play / pause |
+| `←` `→` | previous / next frame |
+| `↑` `↓` | faster / slower playback |
+| `w` `s` | widen / shrink the time window |
+| `q` / `Esc` | quit |
+
+---
+
+## Using the data: default frames and intent proxies
+
+`ds[i]` already returns everything needed for a per-frame batch: the default observation, state and action, plus the proxy windows configured in `info.json`. There is no need to build a custom window dataset first.
+
+| Key | Typical shape | Meaning |
+|-----|---------------|---------|
+| `observation.images.head_rgb` | `(3, H, W)` | camera frame |
+| `observation.state` | `(58,)` | fused head/wrist pose + 40 finger joints |
+| `action` | `(58,)` | fused action target |
+| `observation.eye_gaze` | `(N_g, 2)` | gaze window in pixels |
+| `observation.left_wrist_emg` | `(N_e, 8)` | EMG window, 8 channels |
+| `observation.eeg_denoise` | `(N_c, 132)` | EEG window, 132 channels |
+
+The proxy windows are variable-length, so batching only needs padding and a mask — not resampling or manual temporal stacking. Print `ds.meta.features` first: some releases expose EMG under a different suffix (`*_raw` / `*_denoise`).
+
+### Batch the default fields
+
+```python
+from pathlib import Path
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, Subset
+
+from humancoin import HumanCOINDataset
+
+REPO = "HumanCOIN/l3_bedroom_fold_clothes_eye_1600x1200_30fps_12views_eeg128_emg8"
+ds = HumanCOINDataset(
+    repo_id=REPO,
+    root=Path("data") / REPO,
+    tolerance_s=1 / 30,          # L3 videos can be one frame off the master grid
+)
+
+PROXY_KEYS = (
+    "observation.eye_gaze",
+    "observation.left_wrist_emg",
+    "observation.eeg_denoise",
+)
+
+
+def collate(batch):
+    out = {
+        "observation.images.head_rgb": torch.stack(
+            [b["observation.images.head_rgb"] for b in batch]),
+        "observation.state": torch.stack([b["observation.state"] for b in batch]),
+        "action": torch.stack([b["action"] for b in batch]),
+    }
+    for key in PROXY_KEYS:
+        seqs = [b[key] for b in batch]
+        length = max(len(seq) for seq in seqs)
+        dim = seqs[0].shape[-1]
+        padded = torch.zeros(len(seqs), length, dim)
+        mask = torch.zeros(len(seqs), length, dtype=torch.bool)
+        for i, seq in enumerate(seqs):
+            if len(seq):
+                padded[i, :len(seq)] = seq
+                mask[i, :len(seq)] = True
+        out[key] = padded
+        out[f"{key}_mask"] = mask
+    return out
+
+
+loader = DataLoader(
+    Subset(ds, range(1, len(ds))),   # skip frame 0, whose video may start one tick late
+    batch_size=8,
+    shuffle=True,
+    collate_fn=collate,
+)
+```
+
+### Demo: add gaze, EMG and EEG to the action head
+
+This small model is deliberately simple: one image encoder, one linear state encoder, one encoder per proxy stream, masked mean pooling over each window, and an action head. It is enough to show how gaze, EMG and EEG enter the same forward pass as `o` and `a`.
+
+```python
+class ProxyPolicy(nn.Module):
+    def __init__(self, state_dim=58, action_dim=58, width=64):
+        super().__init__()
+        self.image = nn.Sequential(
+            nn.Conv2d(3, 16, 5, stride=2, padding=2), nn.ReLU(),
+            nn.Conv2d(16, 32, 3, stride=2, padding=1), nn.ReLU(),
+            nn.AdaptiveAvgPool2d(1), nn.Flatten(),
+            nn.Linear(32, width),
+        )
+        self.state = nn.Linear(state_dim, width)
+        self.gaze = nn.Linear(2, width)
+        self.emg = nn.Linear(8, width)
+        self.eeg = nn.Linear(132, width)
+        self.head = nn.Sequential(
+            nn.Linear(width * 5, width * 2), nn.GELU(),
+            nn.Linear(width * 2, action_dim),
+        )
+
+    @staticmethod
+    def masked_mean(x, mask):
+        x = x * mask.unsqueeze(-1)
+        return x.sum(1) / mask.sum(1, keepdim=True).clamp_min(1)
+
+    def forward(self, batch):
+        image = F.interpolate(
+            batch["observation.images.head_rgb"],
+            size=(128, 128), mode="bilinear", align_corners=False,
+        )
+        z_img = self.image(image)
+        z_state = self.state(batch["observation.state"])
+        z_gaze = self.masked_mean(
+            self.gaze(batch["observation.eye_gaze"]),
+            batch["observation.eye_gaze_mask"],
+        )
+        z_emg = self.masked_mean(
+            self.emg(batch["observation.left_wrist_emg"]),
+            batch["observation.left_wrist_emg_mask"],
+        )
+        z_eeg = self.masked_mean(
+            self.eeg(batch["observation.eeg_denoise"]),
+            batch["observation.eeg_denoise_mask"],
+        )
+        return self.head(torch.cat([z_img, z_state, z_gaze, z_emg, z_eeg], dim=-1))
+
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model = ProxyPolicy().to(device)
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+
+for step, batch in enumerate(loader):
+    batch = {key: value.to(device) for key, value in batch.items()}
+    pred = model(batch)
+    loss = F.mse_loss(pred, batch["action"])
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    print(f"step {step}: loss={loss.item():.4f}")
+    if step == 0:               # one step is enough to check the wiring
+        break
+```
+
+On a real L3 episode this produces a finite loss for a single step; that only proves the shapes and gradients line up.
+
+### Connecting to LeRobot Diffusion Policy
+
+LeRobot's `DiffusionPolicy` consumes `observation.images.*`, `observation.state` and `action`, and builds its global conditioning from the image and state encoders. The stock `DiffusionConfig` has no first-class `gaze`/`emg`/`eeg` inputs. To use the proxies there, the smallest change is to fuse the three proxy embeddings into one vector and either:
+
+- concatenate it to `observation.state` and widen the policy's state feature, or
+- inject it as an extra global-conditioning token inside `DiffusionModel._prepare_global_conditioning`.
+
+`lerobot-train` also expects a merged `LeRobotDataset` with dataset statistics; HumanCOIN's per-stream layout is not that format. A production pipeline therefore needs a small adapter or a materialised fixed-rate view. The demo above deliberately avoids pretending that `DiffusionPolicy` runs unchanged.
+
+### Why this is not directly usable
+
+- **The action is human, not robotic.** `action` is a 58-D fused pose-and-finger vector; a robot needs retargeting, a latent action space, or a different head.
+- **One episode is not a dataset.** This is a plumbing test on a 28 s recording, not a trained policy.
+- **No normalisation or evaluation.** Actions and proxies are used at raw scale; a real run needs statistics, a train/val split and task metrics.
+- **Proxy keys vary.** Releases can expose `*_raw` / `*_denoise` or `left_wrist_emg` / `.denoised`; always read `ds.meta.features` and substitute the actual keys.
+- **The windows are short by design.** A 33 ms gaze/EMG/EEG window is the default query, not necessarily the right temporal context for intent; window choice is a modelling decision.
+
+### What the corpus is for
+
+The interesting uses are one level up: pretraining multimodal representations on 12,500 h, learning proxy models `p(m | o)`, training intent-conditioned architectures `p(a | o, m)`, estimating gaze/hand pose where only video exists, and testing whether intent transports across tiers. A production training recipe is **not the focus of this project**; the corpus and its readers are. If you build a stronger baseline, a conversion script or a new architecture on top of it, community contributions and issues are welcome.
+
+---
+
+## How the data was collected
+
+<p align="center">
+  <img src="assets/tier-kits.jpg" alt="Instrumentation by tier: headband, EMG armbands, EEG cap, wrist cameras, eye tracker, gloves and trackers" width="100%">
+  <br>
+  <sub>The three kits. L1: third-party headbands. L2: a fixed four-camera headband plus bilateral EMG armbands. L3: the L2 kit plus EEG, wrist cameras and, in the controlled setting, eye tracker, gloves and 6-DoF trackers. Figure from the paper.</sub>
+</p>
+
+### Hardware configuration
+
+| Tier | Stream | Device (example) | Native resolution / channels | Rate | Unit |
+|------|--------|------------------|------------------------------|------|------|
+| L1 | head RGB | third-party headbands: 14 units, 13 vendors, 2–6 lenses | 512×512–3840×1200 | 20–60 fps | RGB |
+| L2 | head RGB | four-camera headband, hardware-synchronized front pair | 1920×1200 | 30 fps | RGB |
+| L2/L3 | wrist RGB | JIERUIWEITONG FH868 | 640×480 (up to 1920×1080 in some L2 releases) | 30 fps | RGB |
+| L3 | eye scene camera | Pupil Labs Neon | 1600×1200 | 30 fps | RGB |
+| L3 | third-person | Intel RealSense D455f | 640×480 | 30 fps | RGB-D |
+| L3 | gaze | Pupil Labs Neon | x, y pixel in the scene camera | 200 Hz | px |
+| L3 | head / wrist pose | HTC VIVE Tracker 3.0 ×3 | 6-DoF in one shared frame | ≈800 Hz device | mm / deg |
+| L3 | finger kinematics | MANUS Metaglove Pro Haptics | 20 joints per hand | ≈800 Hz device | deg |
+| L2/L3 | surface EMG | WLEMGUV2A armbands ×2 | 8 channels per arm | 2 kHz | mV |
+| L3 | EEG, controlled | Compumedics Neuroscan SynAmps2 | 128 channels | 1 kHz | µV |
+| L3 | EEG, open | BrainCo BCIGo | 32 or 8 channels | 250 Hz | µV |
+| L1–L3 | audio | headband microphone | mono | 16 kHz | PCM |
+
+The table lists the native capture configuration; a released stream may be downscaled, so read the actual shape from `meta/info.json`. L1 gaze, depth, pose and hands are inferred from video; L3 measures pose with trackers and gloves in the controlled setting. No instrument is daisy-chained through another: a single host receives every stream and stamps arrival offsets, so each device keeps its own clock and native rate. A parallel-port box also stamps phase and run transitions into the EEG amplifier, so protocol events live on the amplifier clock as well as the host clock.
+
+### Open vs. controlled, imagery vs. execution
+
+L1 and L2 are collected in the **open setting**: wearable instruments, a headband computer, and free movement through everyday scenes. L2 and L3 use task sheets to stage the same objects and step order across sessions. L3 also has a **controlled setting** at a fixed desk, where dense EEG, eye tracking and motion capture require a still posture.
+
+Controlled sessions run in two phases. In **imagery**, the screen turns blue, the operator sits still and rehearses the task sequence while EEG and gaze are recorded. In **execution**, the screen turns green and the same task is performed with every modality live. Phase markers (`run start`, `imagine`, `execute`, `run end`) are written into the record, so the two phases can be cut from any stream on a common time base.
+
+### From raw signals to released tables
+
+Each stream is processed by the group that understands its physics, then aligned:
+
+| Stage | What is done | What ships |
+|-------|--------------|------------|
+| Synchronization and calibration | Samples are stamped relative to episode start; the host records arrival offsets; cameras, trackers and the eye tracker are calibrated per session. | Per-stream timestamps, intrinsics, distortion, rectification and tracker transforms. |
+| Geometry and motion | Depth from FoundationStereo on the synchronized front pair; point clouds projected per frame; hands reconstructed over overlapping video windows and anchored in depth. | Depth maps, point clouds, head/wrist/chest pose and finger kinematics; controlled L3 replaces estimates with tracker and glove measurements. |
+| Gaze | Measured at 200 Hz by the eye tracker in controlled L3; elsewhere predicted from video at 30 Hz. | `eye_gaze` and `eye_gaze_predict` under separate names. |
+| EMG | Zero-phase 20–450 Hz band-pass and 50 Hz comb notch; raw and denoised traces kept. | `*_emg_raw` / `*_emg_denoise` (names vary), sampled at 2 kHz. |
+| EEG | De-mean, 0.5–100 Hz band-pass, 50 Hz notch, bad-channel detection, ICA removal of ocular and muscle components, spherical-spline interpolation and average reference. | Raw and cleaned EEG tables; residual motion noise is documented, not hidden. |
+| Annotation and QC | Argus over Qwen proposes step-level labels; a human reviews every export. Each session is checked stream by stream after writing. | Structured annotation JSON, `qc_reports.jsonl`; a failing session is recaptured, not patched. |
+
+### Privacy and consent
+
+All participants gave written informed consent and could withdraw at any time. Released episodes are de-identified: faces are blurred in every view, and all tiers follow the same consent and de-identification protocol. The data is released for research use under CC BY-NC 4.0; the code is Apache-2.0.
+
+---
+
+## Comparison with other datasets
+
+The point of HumanCOIN is not scale alone; it is the combination of scene coverage and three measurement depths of the intent pathway under one task set and one clock.
+
+| Dataset | Hours | Cameras | Depth / 3D | Gaze | sEMG | EEG | Finger kinematics |
+|---------|-------|---------|------------|------|------|-----|-------------------|
+| Ego4D | 3,670 | 1 head | subset | subset | – | – | subset |
+| Ego-Exo4D | 1,286 | head + 4–5 exo | reconstructed | ✓ | – | – | ✓ |
+| EgoDEX | 829 | 1 head | – | – | – | – | ✓ |
+| EgoBrain | 61 | 1 head | – | – | – | ✓ | – |
+| Xperience-10M | 10,000 | 6 head | reconstructed | – | – | – | ✓ |
+| **HumanCOIN** | **12,500** | **2–6 head, 2 wrist\*, exo\*** | **reconstructed** | **✓ / P** | **✓** | **✓\*** | **✓ / P** |
+
+`✓` measured, `P` predicted/estimated from video, `–` not provided, `*` subset of the corpus. Depth and 3D in HumanCOIN are reconstructed from stereo video except where the controlled kit measures pose directly. The table is a comparison, not a census; the paper discusses the full set.
+
+---
+
+## Recording your own streams
+
+The same package can write a multi-rate dataset in the HumanCOIN layout. If you only consume HumanCOIN data, skip this section.
 
 ```python
 import numpy as np
 from humancoin import HumanCOINDataset
 
 ds = HumanCOINDataset.create(
-    repo_id="my_dataset", root="data/", fps=30,
+    repo_id="my_multirate_dataset",
+    root="data/my_multirate_dataset",
+    fps=30,
     features={
-        # camera: dtype="video" auto-encodes to MP4
         "observation.images.cam": {
             "dtype": "video", "shape": (480, 640, 3),
             "names": ["h", "w", "c"], "fps": 30,
         },
-        # high-rate IMU: window defines "return all readings in (t-33ms, t]"
         "observation.imu": {
             "dtype": "float32", "shape": (6,),
             "names": ["ax", "ay", "az", "gx", "gy", "gz"],
-            "fps": 1000,
-            "window": (-0.033, 0.0),
-            "tolerance_s": 0.002,
+            "fps": 1000, "window": (-1 / 30, 0.0),
         },
-        # mid-rate EEG
-        "observation.eeg": {
-            "dtype": "float32", "shape": (8,),
-            "names": ["Fz", "Cz", "Pz", "Oz", "F3", "F4", "C3", "C4"],
-            "fps": 256,
-            "window": (-0.033, 0.0),
-        },
-        # end-effector pose: no window → nearest neighbor by default
         "observation.state": {
             "dtype": "float32", "shape": (7,),
-            "names": ["x", "y", "z", "roll", "pitch", "yaw", "gripper"],
+            "names": ["x", "y", "z", "roll", "pitch", "yaw", "grip"],
             "fps": 30,
         },
         "action": {
@@ -245,593 +839,62 @@ ds = HumanCOINDataset.create(
     },
 )
 
-# recording: task = master clock, each frame is bounded by a task call
-for i in range(300):
-    # high-rate sensors: multiple writes per frame
-    for _ in range(33):   # 1000Hz / 30fps ≈ 33
+# imu_sample, state, action and image are your own arrays/tensors
+for _ in range(300):
+    for _ in range(33):                       # 1000 Hz / 30 fps
         ds.add_frame("observation.imu", imu_sample)
-    for _ in range(8):    # 256Hz / 30fps ≈ 8
-        ds.add_frame("observation.eeg", eeg_sample)
+    ds.add_frame("task", "reach_target")      # frame boundary = master clock
+    ds.add_frame("observation.state", state)
+    ds.add_frame("action", action)
+    ds.add_frame("observation.images.cam", image)
 
-    # a task call = frame boundary, timestamp auto-generated
-    ds.add_frame("task", "reach_target")
-
-    # camera-rate sensors: once per frame
-    ds.add_frame("observation.state", joint_state)
-    ds.add_frame("action", action_cmd)
-    ds.add_frame("observation.images.cam", camera_image)
-
-ds.save_episode()
+ds.save_episode()                             # flush buffers, write metadata, check alignment
 ```
 
-**Reading** — window features return all readings in the window, nearest features return a single vector:
-
-```python
-ds = HumanCOINDataset(repo_id="my_dataset", root="data/")
-item = ds[10]
-
-item["observation.imu"]             # tensor([33, 6]) — 33 readings in (-0.033, 0]
-item["observation.imu_timestamps"]  # tensor([33])
-item["observation.eeg"]             # tensor([8, 8])
-item["observation.state"]           # tensor([7]) — nearest
-item["observation.images.cam"]      # tensor([3, 480, 640]) — CHW
-item["task"]                        # "reach_target"
-```
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant DS as Dataset
-    participant PF as ParquetFeature<br/>(imu)
-    participant VF as VideoFeature<br/>(cam)
-    participant IX as MasterIndex
-
-    loop each frame
-        User->>DS: add_frame("imu", data)
-        DS->>DS: _auto_timestamp("imu")<br/>ts = counter × 1/1000
-        DS->>PF: add(data, ts)
-        Note over PF: buffer.append((ts, data))
-
-        User->>DS: add_frame("task", "reach")
-        DS->>DS: ts = len(index) / fps
-        DS->>IX: record_frame(ts, "reach")
-
-        User->>DS: add_frame("cam", image)
-        DS->>DS: _auto_timestamp("cam")<br/>ts = counter × 1/30
-        DS->>VF: add(image, ts)
-        Note over VF: save PNG + record timestamp
-    end
-
-    User->>DS: save_episode()
-    DS->>IX: write(ep_idx) → master_index.parquet
-    DS->>PF: save() → imu.parquet
-    DS->>VF: save() → timestamp parquet + MP4
-    DS->>DS: meta.save_episode()
-    DS->>DS: _check_episode_alignment()
-```
-
-## 4. Demo & Visualization
-
-### 4.1 Running the Demo
-
-```bash
-# write 3 episodes of simulated data
-python -m examples.01write_simple
-
-# read and inspect the data
-python -m examples.01read_simple
-
-# interactive visualizer
-humancoin-visualize data/demo --episode 0
-
-# web visualizer (browser UI, draggable time window)
-humancoin-visualize-web /path/to/dataset
-
-# audio: microphone stored as WAV + timestamp parquet
-python -m examples.06audio_example
-```
-
-The web visualizer supports optional zero-phase filtering of EEG/EMG strips: open the 滤波 panel on a strip and combine a high-pass / low-pass Butterworth with a comb notch at the line frequency and all its harmonics (EEG/EMG presets included). The API takes the same spec per feature: `/api/frame?...&filt=observation.eeg:hp=0.5,lp=40,notch=50`.
-
-It also renders a 3D pose view in the SteamVR right-handed y-up world (`*_pose` 6-DoF features as coordinate triads + recent-history motion trails with time fading, fingertip end-effector paths from `hand_skeleton` FK; drag to rotate, wheel to zoom) and a color-coded electrode grid for static snapshot features such as `eeg_impedance` (quality-banded per channel). Pose rotation follows the recorder exactly (`R = Rz(yaw)·Ry(pitch)·Rx(roll)`, the inverse of the recorder's ZYX euler decomposition of the OpenVR matrix); hand skeletons attach via a constant per-hand Manus→tracker mount map (+z = finger, +y = back of hand, plus a −5cm offset along −y since the tracker sits above the back of the hand).
-
-### 4.2 Demo 1: Writing (01write_simple.py)
-
-The main write demo: a set of simulated sensor streams — 3 cameras + IMU + EEG + EMG + temperature — recording three 2-second episodes (`reach_target`, `pour_liquid`, `stack_blocks`):
-
-| Sensor | Shape | Rate | Window |
-|--------|------|------|--------|
-| head_rgb | 480×640×3 | 30 fps | — (video) |
-| left_wrist_rgb | 480×640×3 | 30 fps | — (video) |
-| right_wrist_rgb | 480×640×3 | 30 fps | — (video) |
-| imu | 6 (accel+gyro) | 1000 Hz | (-0.033, 0.0) |
-| eeg | 8 (EEG channels) | 256 Hz | (-0.033, 0.0) |
-| emg_left | 4 (muscle channels) | 100 Hz | (-0.033, 0.0) |
-| emg_right | 4 (muscle channels) | 100 Hz | (-0.033, 0.0) |
-| temperature | 1 | 10 Hz | — (nearest) |
-| state | 7 (x,y,z,r,p,y,grip) | 30 Hz | — (nearest) |
-| action | 7 (velocity commands) | 30 Hz | — (nearest) |
-
-What it shows:
-
-- `dtype: "video"` features auto-encode to MP4, exactly one frame per master frame
-- high-rate sensors are written multiple times between two task calls; timestamps are auto-generated per feature as `timestamp_start + counter × 1/fps`
-- each `save_episode()` writes `master_index.parquet` + per-feature parquets + videos, then runs the alignment checker (every feature should report OK)
-
-```bash
-python -m examples.01write_simple
-```
-
-### 4.3 Demo 2: Reading (01read_simple.py)
-
-Reads the dataset written by Demo 1 and exercises every read path end to end:
-
-- window features (`observation.imu`) return all readings in the window plus their timestamps
-- nearest features (`observation.temperature`, `observation.state`, `action`) return a single vector
-- videos are decoded back to CHW tensors
-- `window_overrides` widen the IMU window at read time without touching the stored data
-- prints the IMU segment sizes across frames — the first frames are empty because the IMU only comes online at `timestamp_start: 0.1`
-
-```bash
-python -m examples.01read_simple   # needs data/ from 01write_simple
-```
-
-### 4.4 Demo 3: Alignment Tolerance (02tolerance_example.py)
-
-Shows the alignment checker catching a sensor that violates the alignment contract: the IMU is configured with `timestamp_start: 0.1` (it comes online 100 ms late) plus a tight `tolerance_s: 0.002`, so its samples are too far from the first master frames. After `save_episode()` the checker writes the offending frames to `meta/alignment_check.jsonl` and the demo prints the report.
-
-Rule of thumb: `tolerance_s` must cover the distance from a master frame to the sensor's nearest sample — at most half its period (e.g. ≤ 50 ms for a 10 Hz sensor) — plus startup offset and jitter.
-
-```bash
-python -m examples.02tolerance_example
-```
-
-### 4.5 Demo 4: Window Modes (03window_example.py)
-
-One episode, three aggregation modes side by side:
-
-- `observation.imu` at 1000 Hz with `window: (-0.033, 0.0)` — range query, ~33 readings per frame
-- `observation.finger_pose` at 120 Hz with `window: "interpolate"` — value interpolated at the frame timestamp
-- `observation.temperature` at 10 Hz with no window — nearest neighbor
-
-Then the dataset is reopened with `window_overrides` — a wider IMU window, finger pose switched to a range query — proving that the window is a read-time decision, not a property of the stored data.
-
-```bash
-python -m examples.03window_example
-```
-
-### 4.6 Demo 5: Delta Timestamps (04delta_example.py)
-
-Multi-frame temporal queries with `delta_timestamps={"observation.state": [-0.1, 0.0, 0.1]}`: reading `ds[i]` returns state stacked over three timepoints (t-0.1, t, t+0.1) instead of one vector — the building block for delta-pose training and temporal augmentation.
-
-```bash
-python -m examples.04delta_example
-```
-
-### 4.7 Demo 6: Asynchronous Sensor Startup (05async_startup_example.py)
-
-Real sensors don't come online at the same instant: after the process starts, each one returns its first frame at its own wall-clock time (IMU at 0.04 s, EMG at 0.12 s, EEG amplifier at 0.31 s, …). This demo simulates such streams and aligns them to the master clock **before** adding data:
-
-1. **t_all_started** — the wall-clock moment every sensor has delivered its first frame (the max of all first-frame times).
-2. **t = 0** — the master clock reference sensor's first frame at/after `t_all_started`; its earlier frames are discarded.
-3. **timestamp_start** — for every other sensor, the delta between its next frame (first frame at/after t = 0) and the t = 0 frame; set it in the feature spec so the stored timestamps stay phase-aligned with the master clock.
-4. **Record** everything from t = 0 onward. The episode ends when the master clock stops, but each sensor keeps streaming until its **next frame after the master's last one** — that trailing sample keeps the last frame's window full.
-
-Simulated startup latencies:
-
-| Sensor | Rate | First frame (wall clock) |
-|--------|------|--------------------------|
-| `observation.imu` | 1000 Hz | 0.04 s |
-| `observation.emg` | 100 Hz | 0.12 s |
-| `observation.state` (master clock reference) | 30 Hz | 0.18 s |
-| `observation.temperature` | 10 Hz | 0.22 s |
-| `action` | 30 Hz | 0.24 s |
-| `observation.eeg` | 256 Hz | 0.31 s |
-
-The demo computes `t_all_started = 0.31 s`, takes the master's next frame as t = 0, derives each sensor's `timestamp_start`, writes the dataset, verifies on disk that every feature's first stored timestamp equals its `timestamp_start` and that its last sample lands past the master stop, then reads back frame 0, a mid-episode frame, and the last frame.
-
-Two consequences worth knowing:
-
-- **Frame 0's backward window is empty.** Every sensor's first stored frame sits at its own `timestamp_start` > 0 and earlier data is discarded by design, so a window like `(-0.033, 0.0)` has nothing to return on the first frame(s).
-- **Tolerance must cover half the sensor's period.** The alignment checker compares each master frame against the sensor's *nearest* sample, whose distance is at most half a period (a 10 Hz sensor can be up to 50 ms away) plus jitter — e.g. `tolerance_s: 0.06` for the 10 Hz temperature sensor here.
-
-```bash
-python -m examples.05async_startup_example
-```
-
-### 4.8 Demo 7: Audio (06audio_example.py)
-
-One camera + state + a simulated microphone, showing the audio storage path end to end:
-
-- `dtype: "audio"` features define `shape` as one chunk of samples `(n_samples,)` (mono) or `(n_samples, channels)` and require `sample_rate`
-- one `add_frame` per master frame stores one chunk; `save_episode()` concatenates all chunks into one PCM16 WAV per episode under `audios/`, plus a timestamp parquet index (`timestamp | episode_index | num_samples`) next to the other per-feature parquets
-- reading `ds[i]` in nearest mode resolves the chunk nearest the master timestamp through the parquet index and returns it whole — the atomic unit, analogous to one video frame; with a `window` (spec, `window_overrides`, or a direct `read(..., window=(start, end))` argument) it returns every sample whose time lies in `(t + start, t + end]`, sliced with sample precision across chunk boundaries and concatenated
-- the alignment checker reports WAV integrity: chunk count vs index rows, sample count vs summed index
-
-```bash
-python -m examples.06audio_example
-```
-
-### 4.9 Visualizer Controls
-
-**Visualizer** (`humancoin-visualize data/demo --episode 0`):
-
-![Visualizer screenshot](examples/visualize.png)
-
-```
-space    — play / pause
-← →      — step frame backward / forward
-↑ ↓      — faster / slower playback
-w s      — widen / shrink the window
-q / Esc  — quit
-```
-
-
-## 5. Core Concepts
-
-### 5.1 Per-Feature Independent Storage
-
-Storage layout:
-
-```
-data/
-└── chunk-000/
-    └── episode_000000/
-        ├── master_index.parquet                # timestamp | frame_index | task_index
-        ├── observation.imu.parquet             # 1000Hz · 1980 rows · 6 cols
-        ├── observation.eeg.parquet             # 256Hz · 512 rows · 8 cols
-        ├── observation.state.parquet           # 30Hz · 60 rows · 7 cols
-        └── observation.images.head_rgb.parquet # 30Hz · 60 rows · timestamps only
-
-videos/
-└── chunk-000/
-    └── observation.images.head_rgb/
-        └── episode_000000.mp4
-
-audios/
-└── chunk-000/
-    └── observation.audio.mic/
-        └── episode_000000.wav
-```
-
-Every non-video feature gets one parquet with a uniform column layout:
-
-```
-timestamp (float64) | episode_index (int64) | col_0 (float32) | ... | col_D (float32)
-```
-
-- camera-rate features (state, action): one row per frame, rows = frames
-- high-rate features (imu, eeg): multiple samples between frames, rows = rate × duration
-- camera features: timestamp parquet + MP4 video
-- audio features: timestamp parquet (`timestamp | episode_index | num_samples`, one row per added chunk) + one WAV per episode; chunks are concatenated in timestamp order
-
-### 5.2 Task as the Master Clock
-
-The whole dataset is organized around **task calls as frame boundaries**: `add_frame("task", ...)` declares "the current frame ends here, the next one begins".
-
-- **Frame** = all feature data written between two task calls. `add_frame("task", ...)` auto-generates the frame timestamp: `t = frame_index / fps` (override with `timestamp=` if needed)
-- **Master clock** = the frame sequence. Reading `ds[i]` first looks up the i-th frame timestamp t in `master_index`; every feature is then aligned around t (window / nearest neighbor, see 5.3)
-- **Each feature's timestamps are generated independently** of the master clock: one counter per feature, `ts = timestamp_start + counter × (1 / fps)` on each `add_frame`; counters reset after `save_episode()`
-- **No master_feature to configure** — task is the master clock, and features of any sampling rate align to it
-
-```python
-# standard call order per frame: high-rate first → task bounds the frame → low-rate last
-ds.add_frame("observation.imu", ...)   # high-rate sensor, written multiple times between frames
-ds.add_frame("observation.eeg", ...)
-ds.add_frame("task", "pick_up")        # ← frame boundary: frame_index++, master-clock timestamp
-ds.add_frame("observation.state", ...) # camera-rate sensor, once per frame
-ds.add_frame("observation.images.cam", image)
-```
-
-### 5.3 Window Parameter
-
-The master-clock frame timestamp is the query anchor, but a feature's readings don't necessarily land on a frame — `window` defines "how to aggregate that feature's readings around the frame timestamp":
-
-| `window` value | Behavior | Typical use |
-|------------|------|---------|
-| `None` (default) | nearest neighbor: return the single closest reading | camera-rate sensors (state, action); audio: one whole chunk |
-| `"interpolate"` | linear interpolation at the query time | mid-rate sensors (finger pose) |
-| `(start_s, end_s)` | range query: return all readings in `(t+start, t+end]` | high-rate sensors (IMU, EEG, EMG); audio: sample-precise slice + concat |
-
-```python
-# IMU at 1000Hz, 30fps master → ~33 readings per frame
-"window": (-0.033, 0.0)   # (t-33ms, t]
-
-# wider window for context
-"window": (-0.066, 0.0)   # (t-66ms, t], ~66 readings
-
-# override at read time
-ds = HumanCOINDataset(
-    repo_id="my_dataset", root="data/",
-    window_overrides={"observation.imu": (-0.100, 0.0)},
-)
-```
-
-**Readings returned per feature when querying t = 0.333s (frame 10):**
-
-![Readings returned per feature when querying t = 0.333s (frame 10)](assets/window_query_en.png)
-
-Note that temperature (10Hz) has no sample at 0.333 — its sampling grid is 0.3, 0.4, …, so nearest neighbor falls back to the reading at t=0.300.
-
-
-## 6. API Reference
-
-### Creating a Dataset
-
-```python
-ds = HumanCOINDataset.create(
-    repo_id="my_dataset",
-    fps=30,
-    features={...},          # see Feature Definition Format below
-)
-```
-
-| Parameter | Type | Default | Description |
-|------|------|--------|------|
-| `repo_id` | `str` | — | dataset name, directory name under `root` |
-| `fps` | `float` | — | master-clock frame rate; frame timestamp = `frame_index / fps` |
-| `features` | `dict[str, dict]` | — | feature definitions, format below |
-| `root` | `str \| Path` | `~/.cache/huggingface/lerobot/<repo_id>` | storage root directory |
-| `robot_type` | `str` | `None` | robot type, metadata only |
-| `use_videos` | `bool` | `True` | whether `dtype="video"` features are encoded to MP4 |
-| `image_writer_processes` | `int` | `0` | image writer subprocess count (0 = write in main process) |
-| `image_writer_threads` | `int` | `0` | image writer thread count |
-| `video_backend` | `str` | `None` | video backend (e.g. `"pyav"`), `None` auto-selects |
-| `batch_encoding_size` | `int` | `1` | batch-encode videos every N episodes |
-| `window_overrides` | `dict` | `None` | override each feature's window (same format as at read time) |
-
-### Feature Definition Format
-
-```python
-features = {
-    "feature_key": {
-        "dtype": "video" | "audio" | "float32" | "int64",  # required
-        "shape": (H, W, C) | (N,) | (D,),         # required
-        "names": ["col_0", ...],                  # required
-        # optional:
-        "fps": 1000,              # sampling rate of this feature
-        "window": (-0.033, 0.0),  # query window
-        "timestamp_start": 0.1,   # timestamp start offset
-        "tolerance_s": 0.002,     # alignment tolerance
-        "sample_rate": 16000,     # audio only: sample rate of the WAV
-    }
+Each `add_frame("task", ...)` closes one master frame; high-rate features are written several times between two task calls and keep their own timestamps. The window stored in `info.json` then applies to every future read. Runnable demos live in `examples/`: `01write_simple.py`, `03window_example.py`, `04delta_example.py`, `06audio_example.py`; run them with `python -m examples.<name>` from a source checkout.
+
+---
+
+## Citation and license
+
+If you use HumanCOIN, please cite:
+
+```bibtex
+@article{wu2026humancoin,
+  title   = {HumanCOIN: A 12,500-Hour Dataset for Human Intent in Egocentric Manipulation},
+  author  = {Wu, Shihan and Liu, You and He, Chunyu and Qin, Minghui and Jiao, Longhan and
+             Guo, Jinbang and Xie, Shaoxuan and Tian, Kaixi and Chen, Wenjie and Pang, Jingrui and
+             Zhang, Yuanhang and Zhang, Yichi and Liu, Miao and Pan, Tengfei and Jiao, Yance and
+             Zhang, Yunyan and Li, Yihang and Shen, Yongjian and Liu, Li and Zhu, Kai and
+             Fang, Chen and Chen, Jianxing and Liu, Sihan and Wang, Xiaofeng and Zhao, Jie and
+             Li, Jing and Wang, Yueqi and Tang, Yichen and Li, Wei and Yang, Zhexuan and Cao, Yue and
+             Zhao, Ji and Wang, Kai and Jiang, Dongsheng and Wang, Yongwei and Mu, Wei and
+             Pang, Jiangmiao and Yao, Maoqing and Ding, Wenchao and Zhu, Zheng and Xia, Zhongpu and
+             Du, Dalong and Niu, Jianwei and Gao, Dahui and Yu, Zhiwei and Lei, Bo and Yang, Huan and
+             Lin, Yonghua and Huang, Tiejun and Wang, Zhongyuan and Yao, Guocai},
+  journal = {arXiv preprint arXiv:2611.26434},
+  year    = {2026}
 }
 ```
 
-| Field | Type | Required | Description |
-|------|------|------|------|
-| `dtype` | `str` | ✓ | storage type: `"float32"` (continuous), `"int64"` (discrete/id), `"video"` (camera frames), `"audio"` (microphone chunks) |
-| `shape` | `tuple` | ✓ | shape of a single reading: `(D,)` for numeric features, `(H, W, C)` for video, `(n_samples,)` or `(n_samples, channels)` for audio |
-| `names` | `list[str]` | ✓ | column name per dimension (used as parquet column names) |
-| `fps` | `float` | optional | sampling rate of this feature; timestamps are auto-generated as `timestamp_start + counter × 1/fps`; falls back to master-clock `fps` if omitted |
-| `window` | `None \| "interpolate" \| (start, end)` | `None` | how readings are aggregated at query time (see 5.3) |
-| `timestamp_start` | `float` | `0.0` | timestamp start offset, e.g. the sensor only starts recording at t=0.1s |
-| `tolerance_s` | `float` | `None` | alignment tolerance: after `save_episode()`, per-frame nearest-reading gaps are checked and violations are logged to `meta/alignment_check.jsonl` |
-| `sample_rate` | `int` | audio only | sample rate of the WAV file (e.g. 16000); required for `dtype="audio"` |
+- **Data:** CC BY-NC 4.0 — research and non-commercial use; see the license on each dataset card.
+- **Code:** Apache-2.0.
+- **Paper:** [arXiv:2611.26434](https://arxiv.org/abs/2611.26434).
+- **Project page:** [flagopen.github.io/HumanCOIN](https://flagopen.github.io/HumanCOIN/).
+- **Download and preview:** [HumanCOIN DataManager](https://flagopen.github.io/HumanCOIN-DataManager/).
 
-Conventions and tips:
+---
 
-- feature keys follow LeRobot naming and **must not contain `/`** (e.g. `observation.imu`, `action`)
-- `dtype="video"` features only store a timestamp parquet; images are encoded as MP4 under `videos/`
-- `dtype="audio"` features store one WAV per episode under `audios/` plus a timestamp parquet; each `add_frame` passes one chunk of float32 samples in [-1, 1] (`(n_samples,)` mono or `(n_samples, channels)`). Nearest read returns one whole chunk; a `window` `(start, end)` read returns the samples in `(t+start, t+end]` concatenated (timing contract: a chunk's first sample sits at its label, samples advance at exactly `1/sample_rate`, real dropouts shorten the segment rather than stretch it)
-- always give high-rate features both `fps` and `window` — otherwise the nearest-neighbor query returns a single reading and the high-rate information is lost
+## Acknowledgements
 
-### Writing
+HumanCOIN is built by the BAAI AhaData Group with many collaborating institutions; the paper lists the full author list and affiliations. The dataset format builds on [LeRobot](https://github.com/huggingface/lerobot); storage uses [PyArrow](https://arrow.apache.org/docs/python/), video uses [PyAV](https://pyav.org/), and depth, gaze, hand reconstruction and annotation build on FoundationStereo, EgoM2P, ACE-Ego-Hand, Argus and Qwen. Thanks to the operators, annotators and reviewers who made the corpus, and to everyone who reported issues against the reader and visualizers. The cover, intent-pathway, overview, episode, scene, read-path and instrumentation figures are reproduced from the HumanCOIN report; the viewer screenshot is from a released L3 episode.
 
-```python
-ds.add_frame(key: str, value: np.ndarray | torch.Tensor | str,
-             timestamp: float | None = None)
-ds.save_episode()
-```
+---
 
-- `key`: `"task"` or a defined feature key
-- `value`: `np.ndarray` / `torch.Tensor` for numeric features (shape must match `shape`); `np.ndarray` (H, W, C) for video features; `str` task label for task
-- `timestamp`: `None` auto-generates — task uses the master clock `len(records) / fps`, other features use their own counter `timestamp_start + counter × 1/fps`; pass a `float` to set it manually
+## Collaborating institutions
 
-A complete write loop:
+HumanCOIN is built with the following institutions; the logo wall mirrors the project page.
 
-```python
-FPS = 30
-imu_per_frame = 1000 // FPS   # 33
-eeg_per_frame = 256 // FPS    # 8
-
-for frame in range(60):                        # 2 seconds / 30fps
-    for _ in range(imu_per_frame):             # high-rate: multiple writes per frame
-        ds.add_frame("observation.imu", imu_sample)
-    for _ in range(eeg_per_frame):
-        ds.add_frame("observation.eeg", eeg_sample)
-
-    ds.add_frame("task", "reach_target")       # ← frame boundary
-
-    ds.add_frame("observation.state", joint_state)    # low-rate: once per frame
-    ds.add_frame("action", action_cmd)
-    ds.add_frame("observation.images.cam", camera_image)
-
-ds.save_episode()    # flush all buffers, run alignment/video checks, reset counters
-```
-
-### Reading
-
-```python
-ds = HumanCOINDataset(
-    repo_id="my_dataset", root="data/",
-    episodes=[0, 2],                                    # load only episodes 0, 2
-    image_transforms=my_transforms,                      # torchvision transforms
-    delta_timestamps={"observation.state": [-0.1, 0, 0.1]},  # multi-frame query
-    window_overrides={"observation.imu": (-0.066, 0)},   # override window
-    video_backend="pyav",
-)
-item = ds[10]
-```
-
-| Parameter | Type | Default | Description |
-|------|------|--------|------|
-| `repo_id` | `str` | — | dataset name |
-| `root` | `str \| Path` | `~/.cache/huggingface/lerobot/<repo_id>` | storage root directory |
-| `episodes` | `list[int]` | `None` | load only the given episode indices |
-| `image_transforms` | callable | `None` | image transforms (torchvision style) |
-| `delta_timestamps` | `dict[str, list[float]]` | `None` | multi-frame query: returns `{key: master frame + each offset frame}`, e.g. `{"observation.state": [-0.1, 0, 0.1]}` |
-| `tolerance_s` | `float` | `1e-4` | frame-alignment tolerance for `delta_timestamps` |
-| `video_backend` | `str` | `None` | video decoding backend (e.g. `"pyav"`) |
-| `batch_encoding_size` | `int` | `1` | (write side) video batch-encoding size |
-| `window_overrides` | `dict` | `None` | override each feature's window at read time, e.g. `{"observation.imu": (-0.066, 0)}` |
-
-Depth video reading: features with `info["video.is_depth_map"] = true` and HWC `shape = [H, W, 1]` are decoded directly with PyAV. Reads return native samples as a `(1, H, W)` tensor (e.g. `uint16` for `gray12le`), without RGB conversion or division by 255. Units and invalid values remain those of the stored data. This applies to reading; depth-specific encoding is not implemented.
-
-### Return Structure
-
-```python
-item = ds[10]
-# {
-#     "timestamp": tensor(0.3333),
-#     "frame_index": tensor(10),
-#     "episode_index": tensor(0),
-#     "index": tensor(10),
-#     "task_index": tensor(0),
-#     "task": "reach_target",
-#
-#     # window feature: all readings + timestamps
-#     "observation.imu": tensor([33, 6]),
-#     "observation.imu_timestamps": tensor([33]),
-#
-#     # nearest feature: a single vector
-#     "observation.state": tensor([7]),
-#     "observation.temperature": tensor([1]),
-#
-#     # video feature: CHW format
-#     "observation.images.head_rgb": tensor([3, 480, 640]),
-#
-#     # audio feature: one chunk of samples, float32 in [-1, 1]
-#     "observation.audio.mic": tensor([533]),
-#
-#     # audio feature with window (-0.033, 0): samples in (t-33ms, t], concatenated
-#     "observation.audio.mic": tensor([528]),
-# }
-```
-
-## 7. Architecture
-
-```mermaid
-flowchart TB
-    subgraph Entry["entry layer"]
-        DS["HumanCOINDataset<br/>dataset.py · orchestrator<br/>(inherits LeRobotDataset)"]
-    end
-
-    subgraph Core["core layer"]
-        IX["MasterIndex<br/>index.py"]
-        MD["HumanCOINDatasetMetadata<br/>metadata.py"]
-    end
-
-    subgraph Features["feature layer"]
-        PF["ParquetFeature<br/>parquet.py"]
-        VF["VideoFeature<br/>video.py"]
-        AuF["AudioFeature<br/>audio.py"]
-    end
-
-    subgraph Validate["validation layer"]
-        CK["DatasetChecker<br/>checker.py"]
-    end
-
-    subgraph Store["storage layer"]
-        PQ[("parquet files<br/>data/chunk-*/episode_*/")]
-        MP4[("MP4 videos<br/>videos/chunk-*/")]
-        WAV[("WAV audio<br/>audios/chunk-*/")]
-        META[("metadata<br/>meta/")]
-    end
-
-    DS -->|"frame index I/O"| IX
-    DS -->|"info.json / metadata"| MD
-    DS -->|"write readings / window query"| PF
-    DS -->|"write images / decode videos"| VF
-    DS -->|"write chunks / read WAV"| AuF
-    DS -->|"post-save validation"| CK
-    PF -->|"save / read"| PQ
-    VF -->|"encode MP4"| MP4
-    VF -->|"timestamp table"| PQ
-    AuF -->|"write WAV"| WAV
-    AuF -->|"timestamp table"| PQ
-    IX -->|"save"| PQ
-    MD -->|"save"| META
-    CK -->|"validation report"| META
-
-    style DS fill:#e8eaf6,stroke:#4fc3f7,stroke-width:2px,color:#000
-    style IX fill:#ffebee,stroke:#ef9a9a,color:#000
-    style MD fill:#fafafa,stroke:#9e9e9e,color:#000
-    style PF fill:#e8f5e9,stroke:#66bb6a,color:#000
-    style VF fill:#f3e5f5,stroke:#ce93d8,color:#000
-    style AuF fill:#e8f5e9,stroke:#66bb6a,color:#000
-    style CK fill:#fff3e0,stroke:#ffcc80,color:#000
-    style PQ fill:#fafafa,stroke:#9e9e9e,color:#000
-    style MP4 fill:#fafafa,stroke:#9e9e9e,color:#000
-    style WAV fill:#fafafa,stroke:#9e9e9e,color:#000
-    style META fill:#fafafa,stroke:#9e9e9e,color:#000
-```
-
-**File layout:**
-
-```
-src/humancoin/
-├── dataset.py      (341 lines)  orchestrator — add_frame / save_episode / __getitem__
-├── audio.py        (185 lines)  AudioFeature — buffer chunks, write WAV + timestamp parquet
-├── parquet.py      (168 lines)  ParquetFeature — write buffer, save parquet, load, window query
-├── video.py        (168 lines)  VideoFeature — save PNG, encode MP4, decode frames
-├── index.py        (127 lines)  MasterIndex — frame index I/O
-├── metadata.py     (123 lines)  HumanCOINDatasetMetadata — info.json management
-├── checker.py      (162 lines)  DatasetChecker — video frame count + audio integrity + timestamp alignment checks
-└── utils.py        (236 lines)  constants + info.json creation/validation
-```
-
-**Design principles:**
-
-1. **One object per feature**: `ParquetFeature`, `VideoFeature` and `AudioFeature` each encapsulate their buffer, file paths, and read/write logic. The Dataset is only an orchestrator.
-
-2. **Symmetric read/write**: every Feature provides both `add/save` (write) and `load/query` (read).
-
-3. **Deterministic paths**: file paths depend only on `episode_index` and `feature_key`; no lookups in `episodes.jsonl`.
-
-4. **Inherit, don't rewrite**: inherit `LeRobotDataset` for `start_image_writer`, `_save_image` and other basics; only 4 core methods are overridden.
-
-## 8. Comparison with Native LeRobotDataset
-
-| Aspect | Native LeRobotDataset | humancoin |
-|------|-------------------|------------|
-| Storage | 1 merged parquet | N per-feature parquets |
-| Multi-rate sensors | pre-resampling required | native rates, independent storage |
-| Time alignment | `tolerance_s` tolerance matching | window mechanism (range / interpolate / nearest) |
-| Master clock | camera frame | `add_frame("task", ...)` calls |
-| Video encoding | unified batch encoding in `save_episode` | independent per VideoFeature |
-| Metadata | `episodes.jsonl` records everything | only basic frame info; paths computed deterministically |
-| per-feature fps | not supported | independent `fps` per feature |
-| per-feature tolerance | global `tolerance_s` | independent `tolerance_s` per feature |
-| Audio storage | not supported | WAV per episode + timestamp parquet index, nearest-chunk read |
-| Write API | `add_frame(frame_dict, task)` | `add_frame(key, value)` per field |
-| Alignment check | none | automatic `alignment_check.jsonl` |
-| Video check | none | automatic frame count/duration check |
-
-## 9. Acknowledgements
-
-This project builds on the following open-source projects and work:
-
-- **[LeRobot](https://github.com/huggingface/lerobot)** — the base dataset framework. This project inherits the API design of `LeRobotDataset` and `LeRobotDatasetMetadata` and reuses its video encoding and image writing infrastructure. Thanks to the Hugging Face team for their contributions to the open-source robot learning ecosystem.
-
-- **[PyArrow](https://arrow.apache.org/docs/python/)** — high-performance columnar storage, the basis of per-feature parquet I/O.
-
-- **[PyAV](https://pyav.org/)** — Python bindings for FFmpeg, powering video encoding (AV1) and decoding.
-
-- **[Matplotlib](https://matplotlib.org/)** — visualization.
-
-- The [Neuropixels](https://www.neuropixels.org/) data format and the BIDS standard from the **[Allen Institute for Neural Dynamics](https://alleninstitute.org/division/neural-dynamics/)** — inspiration for organizing multimodal neural data.
-
-Thanks to all colleagues for feedback and discussions.
-
-
-## Building and checking a release
-
-```bash
-pip install -e ".[dev]"
-python -m unittest discover -s tests -v
-python -m build
-python -m twine check dist/*
-```
-
-The wheel includes dataset reading/writing, downloads, and both visualizers. Install `humancoin` to use all these features; no source checkout is required. The `examples/` demonstration scripts require a source checkout.
+<p align="center">
+  <img src="assets/partners.png" alt="HumanCOIN collaborating institutions: BAAI, Peking University, USTC, Tsinghua, Fudan, Beihang and industry partners" width="100%">
+</p>
