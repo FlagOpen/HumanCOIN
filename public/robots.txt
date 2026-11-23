@@ -1,0 +1,13 @@
+# Project pages share the github.io origin, so the origin-root robots.txt is
+# served by GitHub, not by this repository. This file is still shipped for the
+# crawlers and SEO tools that treat the project path (/HumanCOIN/) as the site
+# root; the sitemap is what actually needs submitting in Search Console.
+#
+# Nothing is disallowed on purpose. The page is a Vue SPA: /assets/ carries the
+# bundles Googlebot has to fetch to render it, and /film/ carries the release
+# film whose poster and duration the page advertises. Blocking either would take
+# the page out of the index rather than tidy it up.
+User-agent: *
+Allow: /
+
+Sitemap: https://flagopen.github.io/HumanCOIN/sitemap.xml
