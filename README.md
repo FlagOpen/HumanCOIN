@@ -19,7 +19,7 @@
 <p align="center">
   <img src="assets/wecom-group.png" alt="HumanCOIN group code — scan with WeCom to join" width="150">
   <br>
-  <sub>Questions? Ideas? Come join the group · 有问题、有想法，都来群里聊</sub>
+  <sub>Questions? Ideas? Come join the group.</sub>
 </p>
 
 ## What is HumanCOIN?

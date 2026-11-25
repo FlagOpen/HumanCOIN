@@ -19,7 +19,7 @@
 <p align="center">
   <img src="assets/wecom-group.png" alt="HumanCOIN 企业微信交流群二维码" width="150">
   <br>
-  <sub>有问题、有想法，都来群里聊 · Questions? Ideas? Come join the group</sub>
+  <sub>有问题、有想法，都来群里聊。</sub>
 </p>
 
 ## 这是什么？
@@ -208,7 +208,7 @@ print(item["observation.eeg_denoise"].shape)            # L3 上为 [N, 132]
 
 数据访问、磁盘格式，或者第一帧就跑不通——都不算小问题，来群里问就好。
 
-想一起把它做得更好也很欢迎：改文档、补例子、提 issue、反馈数据集问题，都算贡献。进群打个招呼，我们帮你找个好上手的活儿。
+想一起把它做得更好也很欢迎：改文档、补例子、提建议、反馈数据集问题，都算贡献。进群打个招呼，我们帮你找个好上手的活儿。
 
 <p align="center">
   <img src="assets/wecom-group.png" alt="HumanCOIN 企业微信交流群二维码" width="180">
