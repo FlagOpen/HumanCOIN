@@ -2,8 +2,9 @@
 /**
  * The corner code.
  *
- * The release's WeCom group code, parked in the bottom-right corner: a
- * thumbnail while a reader is reading, the scannable card on hover — or on
+ * The release's WeCom group code, parked at the foot of the right-hand gutter —
+ * the same column the notes rail uses, not the viewport's corner. It reads as a
+ * thumbnail while a reader is reading and as the scannable card on hover, or on
  * keyboard focus, or on a tap, since touch screens have no hover.
  *
  * The card keeps its own white ground in both themes. A QR needs the contrast;
@@ -57,7 +58,10 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside))
 <style scoped>
 .qr {
   position: fixed;
-  right: clamp(0.75rem, 1.2vw, 1.5rem);
+  /* The notes rail's own offset, so the card's right edge lands on the same
+     frame line as the rail above it. Below 1360 the rail is gone and the
+     expression falls back to the page edge. */
+  right: max(1.25rem, calc(50% - var(--article-w) / 2 - var(--toc-w) - var(--toc-gap)));
   bottom: clamp(0.75rem, 1.2vw, 1.5rem);
   /* above the notes rail (40), below the masthead (60) */
   z-index: 45;
