@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <!--
+      Everything below is static on purpose. The page is a Vue SPA, so the head
+      is the only metadata a non-rendering crawler ever sees: the title, the
+      canonical, the social card and the structured data all have to be in the
+      file that ships, not assembled at runtime. The language switch does update
+      title/description/locale afterwards (src/composables/useSeo.ts), but the
+      defaults here must read as English.
+    -->
+    <title>HumanCOIN: 12,500-Hour Egocentric Manipulation Dataset</title>
+    <meta
+      name="description"
+      content="HumanCOIN is a 12,500-hour egocentric manipulation dataset with gaze, sEMG, EEG and glove kinematics: three tiers that make human intent observable."
+    />
+    <meta
+      name="keywords"
+      content="HumanCOIN, egocentric dataset, ego-centric manipulation, human intent, embodied AI, imitation learning, gaze, surface EMG, EEG, glove kinematics, first-person video, robot learning, BAAI"
+    />
+    <meta name="author" content="BAAI · AhaData Group" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+
+    <!-- Canonical + the two locales this page is published in. `?lang=zh` is
+         resolved by the app at boot, so it is a real URL, not a redirect. -->
+    <link rel="canonical" href="https://flagopen.github.io/HumanCOIN/" />
+    <link rel="alternate" hreflang="en" href="https://flagopen.github.io/HumanCOIN/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://flagopen.github.io/HumanCOIN/?lang=zh" />
+    <link rel="alternate" hreflang="x-default" href="https://flagopen.github.io/HumanCOIN/" />
+    <link rel="sitemap" type="application/xml" href="./sitemap.xml" />
+
+    <!-- The project mascot, keyed to transparency. The dark-strip copy is the
+         same mark in white ink, because a black mark vanishes in a dark tab
+         bar; browsers that ignore `media` on an icon fall back to the black
+         one. Both are derived by scripts/build_seo_assets.py. -->
+    <link rel="icon" href="./favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="./favicon-32-dark.png"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      /* Resolve the colour theme before the first paint: stored choice, else
+         the system preference. Kept inline so a slow bundle never flashes the
+         wrong ground. The app's useTheme() takes over once Vue mounts. */
+      ;(() => {
+        try {
+          const stored = localStorage.getItem('humancoin-theme')
+          const mode = stored === 'light' || stored === 'dark' ? stored : 'system'
+          const dark =
+            mode === 'dark' ||
+            (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          const theme = dark ? 'dark' : 'light'
+          document.documentElement.dataset.theme = theme
+          document.documentElement.dataset.themeMode = mode
+          document.documentElement.style.colorScheme = theme
+          const meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', dark ? '#0b131b' : '#ffffff')
+        } catch {
+          /* no storage / no matchMedia: the light default is fine */
+        }
+      })()
+    </script>
+
+    <!-- Open Graph / Twitter. The card is a 1200x630 crop of the film's title
+         frame, rebuilt by scripts/build_seo_assets.py. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="HumanCOIN" />
+    <meta property="og:url" content="https://flagopen.github.io/HumanCOIN/" />
+    <meta property="og:title" content="HumanCOIN: 12,500-Hour Egocentric Manipulation Dataset" />
+    <meta
+      property="og:description"
+      content="From visible action to hidden signals: 12,500 hours of first-person manipulation across 38 scene classes, recorded with gaze, surface EMG, EEG and glove kinematics."
+    />
+    <meta property="og:image" content="https://flagopen.github.io/HumanCOIN/og-cover.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="HumanCOIN title frame: the wordmark over a grid of first-person manipulation stills, with the release numbers underneath."
+    />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_CN" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="HumanCOIN: 12,500-Hour Egocentric Manipulation Dataset" />
+    <meta
+      name="twitter:description"
+      content="From visible action to hidden signals: 12,500 hours of first-person manipulation across 38 scene classes, recorded with gaze, surface EMG, EEG and glove kinematics."
+    />
+    <meta name="twitter:image" content="https://flagopen.github.io/HumanCOIN/og-cover.jpg" />
+    <meta
+      name="twitter:image:alt"
+      content="HumanCOIN title frame: the wordmark over a grid of first-person manipulation stills."
+    />
+
+    <!--
+      Highwire Press tags: the citation metadata Google Scholar reads. The author
+      list mirrors AUTHORS in src/content.ts (arXiv 2611.26434v1, in order); keep
+      the two in step when the byline changes.
+    -->
+    <meta
+      name="citation_title"
+      content="HumanCOIN: A 12,500-Hour Dataset for Human Intent in Egocentric Manipulation"
+    />
+    <meta name="citation_author" content="Shihan Wu" />
+    <meta name="citation_author" content="You Liu" />
+    <meta name="citation_author" content="Chunyu He" />
+    <meta name="citation_author" content="Minghui Qin" />
+    <meta name="citation_author" content="Longhan Jiao" />
+    <meta name="citation_author" content="Jinbang Guo" />
+    <meta name="citation_author" content="Shaoxuan Xie" />
+    <meta name="citation_author" content="Kaixi Tian" />
+    <meta name="citation_author" content="Wenjie Chen" />
+    <meta name="citation_author" content="Jingrui Pang" />
+    <meta name="citation_author" content="Yuanhang Zhang" />
+    <meta name="citation_author" content="Yichi Zhang" />
+    <meta name="citation_author" content="Miao Liu" />
+    <meta name="citation_author" content="Tengfei Pan" />
+    <meta name="citation_author" content="Yance Jiao" />
+    <meta name="citation_author" content="Yunyan Zhang" />
+    <meta name="citation_author" content="Yihang Li" />
+    <meta name="citation_author" content="Yongjian Shen" />
+    <meta name="citation_author" content="Li Liu" />
+    <meta name="citation_author" content="Kai Zhu" />
+    <meta name="citation_author" content="Chen Fang" />
+    <meta name="citation_author" content="Jianxing Chen" />
+    <meta name="citation_author" content="Sihan Liu" />
+    <meta name="citation_author" content="Xiaofeng Wang" />
+    <meta name="citation_author" content="Jie Zhao" />
+    <meta name="citation_author" content="Jing Li" />
+    <meta name="citation_author" content="Yueqi Wang" />
+    <meta name="citation_author" content="Yichen Tang" />
+    <meta name="citation_author" content="Wei Li" />
+    <meta name="citation_author" content="Zhexuan Yang" />
+    <meta name="citation_author" content="Yue Cao" />
+    <meta name="citation_author" content="Ji Zhao" />
+    <meta name="citation_author" content="Kai Wang" />
+    <meta name="citation_author" content="Dongsheng Jiang" />
+    <meta name="citation_author" content="Yongwei Wang" />
+    <meta name="citation_author" content="Wei Mu" />
+    <meta name="citation_author" content="Jiangmiao Pang" />
+    <meta name="citation_author" content="Maoqing Yao" />
+    <meta name="citation_author" content="Wenchao Ding" />
+    <meta name="citation_author" content="Zheng Zhu" />
+    <meta name="citation_author" content="Zhongpu Xia" />
+    <meta name="citation_author" content="Dalong Du" />
+    <meta name="citation_author" content="Jianwei Niu" />
+    <meta name="citation_author" content="Dahui Gao" />
+    <meta name="citation_author" content="Zhiwei Yu" />
+    <meta name="citation_author" content="Bo Lei" />
+    <meta name="citation_author" content="Huan Yang" />
+    <meta name="citation_author" content="Yonghua Lin" />
+    <meta name="citation_author" content="Tiejun Huang" />
+    <meta name="citation_author" content="Zhongyuan Wang" />
+    <meta name="citation_author" content="Guocai Yao" />
+    <meta name="citation_publication_date" content="2026/11/20" />
+    <meta name="citation_online_date" content="2026/11/20" />
+    <meta name="citation_arxiv_id" content="2611.26434" />
+    <meta name="citation_pdf_url" content="https://arxiv.org/pdf/2611.26434" />
+    <meta name="citation_fulltext_html_url" content="https://arxiv.org/abs/2611.26434" />
+    <meta name="citation_language" content="en" />
+    <meta
+      name="citation_abstract"
+      content="HumanCOIN records the intent pathway behind egocentric manipulation: 12,500 hours across 38 scene classes in three tiers — L1 attention, L2 exertion, L3 cognition — with gaze, surface EMG, EEG, glove kinematics, multi-view RGB, metric depth and 6-DoF head and wrist pose under one clock."
+    />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://flagopen.github.io/HumanCOIN/#website",
+            "url": "https://flagopen.github.io/HumanCOIN/",
+            "name": "HumanCOIN",
+            "alternateName": "HumanCOIN dataset",
+            "description": "Homepage of HumanCOIN, a 12,500-hour egocentric manipulation dataset for human intent.",
+            "inLanguage": [
+              "en",
+              "zh-CN"
+            ],
+            "publisher": {
+              "@id": "https://flagopen.github.io/HumanCOIN/#organisation"
+            },
+            "mainEntity": {
+              "@id": "https://flagopen.github.io/HumanCOIN/#dataset"
+            }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://flagopen.github.io/HumanCOIN/#organisation",
+            "name": "Beijing Academy of Artificial Intelligence",
+            "alternateName": "BAAI",
+            "url": "https://www.baai.ac.cn/",
+            "department": {
+              "@type": "Organization",
+              "name": "AhaData Group"
+            }
+          },
+          {
+            "@type": "Dataset",
+            "@id": "https://flagopen.github.io/HumanCOIN/#dataset",
+            "name": "HumanCOIN: A 12,500-Hour Dataset for Human Intent in Egocentric Manipulation",
+            "alternateName": "HumanCOIN",
+            "description": "12,500 hours of egocentric manipulation across 38 scene classes, in three tiers — L1 attention (10,000 h), L2 exertion (2,000 h) and L3 cognition (500 h) — recording gaze, surface EMG, EEG, glove kinematics, multi-view RGB, metric depth, point clouds and 6-DoF head and wrist pose, with step-level action and object annotation over 99 task verbs and 635 object classes.",
+            "url": "https://flagopen.github.io/HumanCOIN/",
+            "sameAs": [
+              "https://github.com/FlagOpen/HumanCOIN",
+              "https://arxiv.org/abs/2611.26434",
+              "https://flagopen.github.io/HumanCOIN-DataManager"
+            ],
+            "keywords": [
+              "egocentric manipulation",
+              "human intent",
+              "first-person video",
+              "gaze",
+              "surface EMG",
+              "EEG",
+              "glove kinematics",
+              "embodied AI",
+              "imitation learning",
+              "robot learning"
+            ],
+            "license": "https://creativecommons.org/licenses/by-nc/4.0/",
+            "isAccessibleForFree": true,
+            "datePublished": "2026-11-20",
+            "inLanguage": [
+              "en",
+              "zh-CN"
+            ],
+            "size": "12,500 hours",
+            "creator": {
+              "@id": "https://flagopen.github.io/HumanCOIN/#organisation"
+            },
+            "publisher": {
+              "@id": "https://flagopen.github.io/HumanCOIN/#organisation"
+            },
+            "citation": {
+              "@id": "https://flagopen.github.io/HumanCOIN/#article"
+            },
+            "variableMeasured": [
+              {
+                "@type": "PropertyValue",
+                "name": "Gaze and attention"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Surface EMG (8 + 8 forearm channels)"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Scalp EEG"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Glove and finger kinematics"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "6-DoF head and wrist pose"
+              },
+              {
+                "@type": "PropertyValue",
+                "name": "Multi-view RGB, metric depth and point clouds"
+              }
+            ]
+          },
+          {
+            "@type": "ScholarlyArticle",
+            "@id": "https://flagopen.github.io/HumanCOIN/#article",
+            "headline": "HumanCOIN: A 12,500-Hour Dataset for Human Intent in Egocentric Manipulation",
+            "name": "HumanCOIN: A 12,500-Hour Dataset for Human Intent in Egocentric Manipulation",
+            "url": "https://arxiv.org/abs/2611.26434",
+            "sameAs": [
+              "https://arxiv.org/abs/2611.26434"
+            ],
+            "identifier": {
+              "@type": "PropertyValue",
+              "propertyID": "arXiv",
+              "value": "2611.26434"
+            },
+            "datePublished": "2026-11-20",
+            "inLanguage": "en",
+            "publisher": {
+              "@id": "https://flagopen.github.io/HumanCOIN/#organisation"
+            },
+            "isPartOf": {
+              "@type": "Periodical",
+              "name": "arXiv"
+            },
+            "author": [
+              {
+                "@type": "Person",
+                "name": "Shihan Wu"
+              },
+              {
+                "@type": "Person",
+                "name": "You Liu"
+              },
+              {
+                "@type": "Person",
+                "name": "Chunyu He"
+              },
+              {
+                "@type": "Person",
+                "name": "Minghui Qin"
+              },
+              {
+                "@type": "Person",
+                "name": "Longhan Jiao"
+              },
+              {
+                "@type": "Person",
+                "name": "Jinbang Guo"
+              },
+              {
+                "@type": "Person",
+                "name": "Shaoxuan Xie"
+              },
+              {
+                "@type": "Person",
+                "name": "Kaixi Tian"
+              },
+              {
+                "@type": "Person",
+                "name": "Wenjie Chen"
+              },
+              {
+                "@type": "Person",
+                "name": "Jingrui Pang"
+              },
+              {
+                "@type": "Person",
+                "name": "Yuanhang Zhang"
+              },
+              {
+                "@type": "Person",
+                "name": "Yichi Zhang"
+              },
+              {
+                "@type": "Person",
+                "name": "Miao Liu"
+              },
+              {
+                "@type": "Person",
+                "name": "Tengfei Pan"
+              },
+              {
+                "@type": "Person",
+                "name": "Yance Jiao"
+              },
+              {
+                "@type": "Person",
+                "name": "Yunyan Zhang"
+              },
+              {
+                "@type": "Person",
+                "name": "Yihang Li"
+              },
+              {
+                "@type": "Person",
+                "name": "Yongjian Shen"
+              },
+              {
+                "@type": "Person",
+                "name": "Li Liu"
+              },
+              {
+                "@type": "Person",
+                "name": "Kai Zhu"
+              },
+              {
+                "@type": "Person",
+                "name": "Chen Fang"
+              },
+              {
+                "@type": "Person",
+                "name": "Jianxing Chen"
+              },
+              {
+                "@type": "Person",
+                "name": "Sihan Liu"
+              },
+              {
+                "@type": "Person",
+                "name": "Xiaofeng Wang"
+              },
+              {
+                "@type": "Person",
+                "name": "Jie Zhao"
+              },
+              {
+                "@type": "Person",
+                "name": "Jing Li"
+              },
+              {
+                "@type": "Person",
+                "name": "Yueqi Wang"
+              },
+              {
+                "@type": "Person",
+                "name": "Yichen Tang"
+              },
+              {
+                "@type": "Person",
+                "name": "Wei Li"
+              },
+              {
+                "@type": "Person",
+                "name": "Zhexuan Yang"
+              },
+              {
+                "@type": "Person",
+                "name": "Yue Cao"
+              },
+              {
+                "@type": "Person",
+                "name": "Ji Zhao"
+              },
+              {
+                "@type": "Person",
+                "name": "Kai Wang"
+              },
+              {
+                "@type": "Person",
+                "name": "Dongsheng Jiang"
+              },
+              {
+                "@type": "Person",
+                "name": "Yongwei Wang"
+              },
+              {
+                "@type": "Person",
+                "name": "Wei Mu"
+              },
+              {
+                "@type": "Person",
+                "name": "Jiangmiao Pang"
+              },
+              {
+                "@type": "Person",
+                "name": "Maoqing Yao"
+              },
+              {
+                "@type": "Person",
+                "name": "Wenchao Ding"
+              },
+              {
+                "@type": "Person",
+                "name": "Zheng Zhu"
+              },
+              {
+                "@type": "Person",
+                "name": "Zhongpu Xia"
+              },
+              {
+                "@type": "Person",
+                "name": "Dalong Du"
+              },
+              {
+                "@type": "Person",
+                "name": "Jianwei Niu"
+              },
+              {
+                "@type": "Person",
+                "name": "Dahui Gao"
+              },
+              {
+                "@type": "Person",
+                "name": "Zhiwei Yu"
+              },
+              {
+                "@type": "Person",
+                "name": "Bo Lei"
+              },
+              {
+                "@type": "Person",
+                "name": "Huan Yang"
+              },
+              {
+                "@type": "Person",
+                "name": "Yonghua Lin"
+              },
+              {
+                "@type": "Person",
+                "name": "Tiejun Huang"
+              },
+              {
+                "@type": "Person",
+                "name": "Zhongyuan Wang"
+              },
+              {
+                "@type": "Person",
+                "name": "Guocai Yao"
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+    <script type="module" crossorigin src="./assets/index-y5kPoOlH.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DnprdVJr.css">
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>
+      <div
+        style="max-width:52rem;margin:3rem auto;padding:0 1.5rem;font:400 1rem/1.65 system-ui,-apple-system,'Segoe UI',sans-serif;color:#14212c"
+      >
+        <p style="font:600 0.75rem/1.4 ui-monospace,monospace;letter-spacing:0.14em;text-transform:uppercase;color:#5b6b78">
+          BAAI · AhaData Group · November 2026
+        </p>
+        <h1 style="font-size:2rem;line-height:1.2;margin:0.5rem 0 1rem">
+          HumanCOIN: A 12,500-Hour Dataset for Human Intent in Egocentric Manipulation
+        </h1>
+        <p style="margin:0 0 1rem">
+          HumanCOIN records the intent behind first-person manipulation: 12,500 hours across 38 scene
+          classes, in three tiers that pair visible action with gaze, surface EMG, EEG, glove kinematics,
+          multi-view RGB, metric depth and 6-DoF pose — all under one clock.
+        </p>
+        <ul style="margin:0;padding-left:1.2rem">
+          <li><a href="https://flagopen.github.io/HumanCOIN-DataManager">Seek and download the dataset</a></li>
+          <li><a href="https://arxiv.org/abs/2611.26434">Read the report (arXiv 2611.26434)</a></li>
+          <li><a href="https://github.com/FlagOpen/HumanCOIN">Code and tooling on GitHub</a></li>
+        </ul>
+        <p style="margin:1.5rem 0 0;color:#5b6b78">
+          This page needs JavaScript for the full release; the links above reach everything it publishes.
+        </p>
+      </div>
+    </noscript>
+  </body>
+</html>
