@@ -3,6 +3,7 @@ import { defineAsyncComponent } from 'vue'
 import SiteNav from '@/components/SiteNav.vue'
 import SiteToc from '@/components/SiteToc.vue'
 import SiteNotes from '@/components/SiteNotes.vue'
+import QrCorner from '@/components/QrCorner.vue'
 import HeroSection from '@/sections/HeroSection.vue'
 import OverviewSection from '@/sections/OverviewSection.vue'
 import SiteFooter from '@/sections/SiteFooter.vue'
@@ -31,6 +32,7 @@ const ReleaseSection = defineAsyncComponent(() => import('@/sections/ReleaseSect
   <SiteNav />
   <SiteToc />
   <SiteNotes />
+  <QrCorner />
 
   <main id="main">
     <HeroSection />
