@@ -10,10 +10,17 @@
   <a href="https://flagopen.github.io/HumanCOIN/">Project page</a> ·
   <a href="https://arxiv.org/abs/2611.26434">Technical report</a> ·
   <a href="https://flagopen.github.io/HumanCOIN-Doc/">Documentation</a> ·
-  <a href="https://flagopen.github.io/HumanCOIN-DataManager/">Data portal</a>
+  <a href="https://flagopen.github.io/HumanCOIN-DataManager/">Data portal</a> ·
+  <a href="#community">Community</a>
 </p>
 
 > 中文版：[README_zh-CN.md](README_zh-CN.md)
+
+<p align="center">
+  <img src="assets/wecom-group.png" alt="HumanCOIN group code — scan with WeCom to join" width="150">
+  <br>
+  <sub>Questions? Ideas? Come join the group · 有问题、有想法，都来群里聊</sub>
+</p>
 
 ## What is HumanCOIN?
 
@@ -196,3 +203,16 @@ Data is released under **CC BY-NC 4.0** for research and non-commercial use. Cod
 <p align="center">
   <img src="assets/partners.png" alt="HumanCOIN collaborating institutions" width="100%">
 </p>
+
+## Community
+
+No question is too small — data access, the on-disk format, or a first frame that will not decode. Come ask in the group.
+
+Want to contribute too? Documentation fixes, examples, bug reports and dataset feedback all count. Say hi in the group and we will help you find something to pick up.
+
+<p align="center">
+  <img src="assets/wecom-group.png" alt="HumanCOIN group code — scan with WeCom to join" width="180">
+  <br>
+  <sub>Scan with WeCom to join the group.</sub>
+</p>
+

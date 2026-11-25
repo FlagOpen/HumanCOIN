@@ -10,10 +10,17 @@
   <a href="https://flagopen.github.io/HumanCOIN/">项目主页</a> ·
   <a href="https://arxiv.org/abs/2611.26434">技术报告</a> ·
   <a href="https://flagopen.github.io/HumanCOIN-Doc/zh/">文档</a> ·
-  <a href="https://flagopen.github.io/HumanCOIN-DataManager/">数据门户</a>
+  <a href="https://flagopen.github.io/HumanCOIN-DataManager/">数据门户</a> ·
+  <a href="#交流群">交流群</a>
 </p>
 
 > English: [README.md](README.md)
+
+<p align="center">
+  <img src="assets/wecom-group.png" alt="HumanCOIN 企业微信交流群二维码" width="150">
+  <br>
+  <sub>有问题、有想法，都来群里聊 · Questions? Ideas? Come join the group</sub>
+</p>
 
 ## 这是什么？
 
@@ -196,3 +203,16 @@ print(item["observation.eeg_denoise"].shape)            # L3 上为 [N, 132]
 <p align="center">
   <img src="assets/partners.png" alt="HumanCOIN 合作机构" width="100%">
 </p>
+
+## 交流群
+
+数据访问、磁盘格式，或者第一帧就跑不通——都不算小问题，来群里问就好。
+
+想一起把它做得更好也很欢迎：改文档、补例子、提 issue、反馈数据集问题，都算贡献。进群打个招呼，我们帮你找个好上手的活儿。
+
+<p align="center">
+  <img src="assets/wecom-group.png" alt="HumanCOIN 企业微信交流群二维码" width="180">
+  <br>
+  <sub>企业微信扫码入群。</sub>
+</p>
+
